@@ -1,0 +1,8 @@
+.next
+node_modules
+coverage
+playwright-report
+pnpm-lock.yaml
+openapi.json
+doc
+CLAUDE.md
