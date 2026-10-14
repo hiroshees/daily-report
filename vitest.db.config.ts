@@ -14,6 +14,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['src/**/*.db.test.ts', 'tests/**/*.db.test.ts'],
+    exclude: ['**/node_modules/**', '.claude/**'],
     globalSetup: ['./tests/db/global-setup.ts'],
     env: {
       DATABASE_URL: testDatabaseUrl,

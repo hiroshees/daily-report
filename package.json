@@ -27,6 +27,7 @@
     "test:e2e:report": "playwright show-report",
     "playwright:install": "playwright install",
     "prepare": "husky",
+    "worktree:add": "bash scripts/worktree-add.sh",
     "openapi:generate": "tsx scripts/generate-openapi.ts",
     "api:types": "tsx scripts/generate-api-types.ts",
     "api:generate": "pnpm run openapi:generate && pnpm run api:types",

@@ -71,6 +71,25 @@ pnpm dev                      # http://localhost:3000
 他に一般: `suzuki` / `sato` / `takahashi` / `ito` / `watanabe` / `kato` / `yoshida`、管理者: `kobayashi`（いずれも `@example.com`）。
 ログイン API（`POST /api/v1/auth/login`）は利用できます。ログイン画面は #8 で実装します。
 
+### git worktree で並行して作業する
+
+ブランチごとに作業ディレクトリを分けたい場合は、次のコマンドで worktree を作ります。
+
+```bash
+pnpm worktree:add <ブランチ名> [ベースのブランチ（既定: main）]
+# → メインの .claude/worktrees/<ブランチ名> に作成される
+```
+
+このコマンドは、`git worktree add` に加えて、**`.env.local` のコピーと `pnpm install`** を行います。
+
+- **`pnpm install` を必ず実行してください。** pre-commit の hook（husky）は `pnpm install` のときに worktree ごとに入ります。
+  入れ忘れた worktree では hook が実行されず、lint エラーのままコミットできてしまいます（無言でスキップされます）。
+- `.env.local` は git 管理外のため、worktree には自動では入りません（スクリプトがコピーします）。
+- `.claude/worktrees/` は git 管理外で、prettier / eslint / vitest の対象からも外してあります（メイン側のチェックに、他の worktree の作業中のコードが混ざりません）。
+- コミット時のチェック（lint-staged・型チェック）は、ルートでもサブディレクトリでも、その worktree のルートで実行されます。`node_modules` が無い worktree では、その旨を表示してコミットを止めます（意図的に省略する場合のみ `git commit --no-verify`）。
+- 開発サーバーは別のポートで起動してください（例: `pnpm dev -p 3001`）。
+- ローカルの DB（docker compose）は全 worktree で共有です。`pnpm test:db` は同時に 1 つの worktree でだけ実行してください（テーブルを空にするため、同時に実行すると互いのテストを壊します）。
+
 ### API スキーマ（Zod → OpenAPI）
 
 Zod スキーマ（`src/schemas/`）が唯一の情報源です。リクエストの検証、`openapi.json`、フロントの型付き API クライアントは、すべてここから作られます。

@@ -1,5 +1,6 @@
 .next
 node_modules
+.claude
 coverage
 playwright-report
 pnpm-lock.yaml

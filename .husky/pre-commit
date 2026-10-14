@@ -1,2 +1,13 @@
+# git worktree やサブディレクトリのどこからコミットしても、そのワーキングツリーのルートで実行する
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# worktree ごとに node_modules が必要。無いまま進むと、他のディレクトリの lint-staged を使ってしまうなど、
+# 原因の分かりにくい失敗になるため、先に止める
+if [ ! -x node_modules/.bin/lint-staged ]; then
+  echo "node_modules がありません。この worktree で pnpm install を実行してください。" >&2
+  echo "（チェックを省略する場合のみ: git commit --no-verify）" >&2
+  exit 1
+fi
+
 pnpm exec lint-staged
 pnpm run typecheck
