@@ -86,6 +86,34 @@ src/schemas/*.ts ──▶ openapi.json ──▶ src/lib/api-schema.d.ts ──
 - Route Handler では `src/schemas/` の Zod スキーマで入力を検証し、エラーメッセージは画面定義書（`doc/SCREEN_DESIGN.md` 6 章）の形式に揃えています。
 - 文字数は**コードポイント単位**で数えます（絵文字を 2 文字として数えません）。
 
+### Route Handler の書き方
+
+API は `defineRoute`（`src/server/http.ts`）で定義します。認証・入力検証・エラー変換・共通ヘッダー（`X-Request-Id`、`Content-Type`）をまとめて面倒を見ます。
+
+```ts
+// src/app/api/v1/customers/route.ts
+export const GET = defineRoute({
+  query: CustomerListQuerySchema, // 検証済みの値が handler に渡る（失敗は 400 VALIDATION_ERROR）
+  handler: async ({ query }) => {
+    const [rows, total] = await listCustomers(query)
+    return paginatedResult(rows, total, query)
+  },
+})
+
+export const POST = defineRoute({
+  auth: 'manager', // 'user'（既定: ログイン必須）| 'manager' | 'none'
+  body: CustomerCreateRequestSchema,
+  status: 201,
+  handler: async ({ body }) => createCustomer(body),
+})
+```
+
+- 認証は**既定でログイン必須**です。公開 API だけ `auth: 'none'` を明示します。認証は入力検証より先に行います。
+- エラーは `throw new ApiError('NOT_FOUND')` のようにコードで投げます。HTTP ステータスとメッセージは `doc/API_SCHEME.md` 4 章と一致します（テストで検証）。
+- 想定外の例外は 500 `INTERNAL_ERROR` になり、詳細（スタックトレースなど）はレスポンスに出さずログにだけ残ります。
+- 権限チェックは `requireAuth()` / `requireManager()` / `canEditReport()`（`src/server/auth.ts`）、一覧は `toSkipTake()` と `paginatedResult()`（`src/server/pagination.ts`）を使います。
+- リクエストボディは 1MB までで、`Content-Type: application/json` が必要です。
+
 ## スクリプト
 
 | コマンド                                | 内容                                        |
@@ -112,6 +140,10 @@ daily-report/
 │   ├── lib/                 # 共通ユーティリティ（Prisma Client など）
 │   ├── schemas/             # Zod スキーマ（API の入出力・OpenAPI 生成元）
 │   └── server/
+│       ├── http.ts          # defineRoute（Route Handler の共通処理）
+│       ├── errors.ts        # ApiError・エラーコードと HTTP ステータス
+│       ├── auth.ts          # 認可ヘルパー
+│       ├── pagination.ts    # ページネーション
 │       ├── services/        # ビジネスロジック
 │       └── repositories/    # DB アクセス
 ├── scripts/                 # 生成スクリプト（OpenAPI・API 型）
