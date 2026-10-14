@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { generateSeedData, SEED_PASSWORD } from './seed/data'
+import { syncSequences, truncateAllTables } from './seed/db'
 import { assertSeedAllowed } from './seed/guard'
 
 const prisma = new PrismaClient()
@@ -20,9 +21,7 @@ async function main() {
   await prisma.$transaction(
     async (tx) => {
       // 再実行しても重複しないよう、全データを削除して採番もリセットしてから投入する
-      await tx.$executeRawUnsafe(
-        'TRUNCATE TABLE "manager_comment", "visit_record", "daily_report", "customer", "sales_person" RESTART IDENTITY CASCADE',
-      )
+      await truncateAllTables(tx)
 
       await tx.salesPerson.createMany({ data: data.salesPersons })
       await tx.customer.createMany({ data: data.customers })
@@ -31,17 +30,7 @@ async function main() {
       await insertInChunks(data.comments, (chunk) => tx.managerComment.createMany({ data: chunk }))
 
       // ID を明示して投入したため、以降の自動採番が衝突しないようシーケンスを進める
-      for (const [table, column] of [
-        ['sales_person', 'sales_person_id'],
-        ['customer', 'customer_id'],
-        ['daily_report', 'report_id'],
-        ['visit_record', 'visit_id'],
-        ['manager_comment', 'comment_id'],
-      ]) {
-        await tx.$executeRawUnsafe(
-          `SELECT setval(pg_get_serial_sequence('"${table}"', '${column}'), COALESCE(MAX("${column}"), 1)) FROM "${table}"`,
-        )
-      }
+      await syncSequences(tx)
     },
     { timeout: 60_000 },
   )

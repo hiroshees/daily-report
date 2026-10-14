@@ -13,7 +13,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    include: ['src/**/*.db.test.ts'],
+    include: ['src/**/*.db.test.ts', 'tests/**/*.db.test.ts'],
     globalSetup: ['./tests/db/global-setup.ts'],
     env: { DATABASE_URL: testDatabaseUrl, DIRECT_URL: testDatabaseUrl },
     // 1つの DB を共有するため、ファイル間も直列で実行する

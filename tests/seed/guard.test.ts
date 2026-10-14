@@ -34,4 +34,20 @@ describe('assertSeedAllowed', () => {
   it('DATABASE_URL が未設定ならエラー', () => {
     expect(() => assertSeedAllowed({})).toThrow('DATABASE_URL')
   })
+
+  it('DATABASE_URL の形式が不正なら、値を表示せずに分かりやすいエラーにする', () => {
+    // ホスト名に空白が含まれる URL は WHATWG URL として不正
+    const databaseUrl = 'postgresql://user:secret-pass@bad host/db'
+
+    let message = ''
+    try {
+      assertSeedAllowed({ DATABASE_URL: databaseUrl })
+    } catch (error) {
+      message = (error as Error).message
+    }
+
+    expect(message).toContain('DATABASE_URL の形式が正しくありません')
+    expect(message).not.toContain('secret-pass')
+    expect(() => assertSeedAllowed({ DATABASE_URL: 'not a url' })).toThrow('形式が正しくありません')
+  })
 })
