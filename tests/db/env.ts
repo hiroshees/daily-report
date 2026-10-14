@@ -6,8 +6,8 @@ import { existsSync } from 'node:fs'
  * TEST_DATABASE_URL が未設定、またはデータベース名が `_test` で終わらない場合は実行を拒否する。
  */
 export function resolveTestDatabaseUrl(): string {
-  // .env があれば読み込む（既に設定済みの環境変数は上書きされない）
-  if (existsSync('.env')) process.loadEnvFile('.env')
+  // .env.local があれば読み込む（既に設定済みの環境変数は上書きされない）
+  if (existsSync('.env.local')) process.loadEnvFile('.env.local')
   const url = process.env.TEST_DATABASE_URL
 
   if (!url) {

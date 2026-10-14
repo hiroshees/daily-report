@@ -36,8 +36,10 @@
     "perf:db-cleanup": "tsx performance-tests/utils/cleanup-test-data.ts",
     "perf:all": "pnpm run perf:db-seed && pnpm run perf:k6 && pnpm run perf:db-cleanup",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:seed": "prisma db seed",
+    "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
+    "db:deploy": "dotenv -e .env.local -- prisma migrate deploy",
+    "db:studio": "dotenv -e .env.local -- prisma studio",
+    "db:seed": "dotenv -e .env.local -- prisma db seed",
     "postinstall": "prisma generate"
   },
   "devDependencies": {
@@ -58,6 +60,7 @@
     "@vitest/coverage-v8": "^3.2.7",
     "@vitest/ui": "^3.2.4",
     "artillery": "^2.0.24",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^15.5.2",
     "eslint-config-prettier": "^10.1.8",

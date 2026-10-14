@@ -26,20 +26,21 @@
 
 ```bash
 pnpm install
-cp .env.example .env          # 値を設定する（JWT_SECRET など）
+cp .env.example .env.local    # 値を設定する（JWT_SECRET など）
 docker compose up -d          # ローカル PostgreSQL（ポート 5433）を起動
 pnpm db:migrate               # マイグレーションを適用
 pnpm dev                      # http://localhost:3000
 ```
 
-- 環境変数は `.env.example` を参照してください（DB 接続情報、JWT の設定）。
-- 認証の実装（#7, #8）までは、`.env` に `DEV_STUB_USER=member`（一般）または `manager`（管理者）を設定すると、
+- 環境変数は `.env.local`（git 管理外）に設定します。項目は `.env.example` を参照してください（DB 接続情報、JWT の設定）。
+- 認証の実装（#7, #8）までは、`.env.local` に `DEV_STUB_USER=member`（一般）または `manager`（管理者）を設定すると、
   ログイン状態を仮定して認証後の画面を確認できます（開発モードのみ有効）。
 - 本番・Preview の DB は Neon（Vercel Marketplace 経由）です。`DATABASE_URL` はプール接続、`DIRECT_URL` は直接接続（マイグレーション用）を設定します。
 
 ### データベース
 
 - スキーマは `prisma/schema.prisma`（ER 図は `doc/ER_DIAGRAM.md`）。変更したら `pnpm db:migrate` でマイグレーションを作成します。
+- Prisma CLI は `.env` しか自動で読まないため、`prisma` を直接実行せず `pnpm db:migrate` / `db:deploy` / `db:seed` / `db:studio`（`.env.local` を読み込むラッパー）を使ってください。
 - ローカル DB は `docker compose down` で停止、`docker compose down -v` でデータごと削除します。
 - DB を使うテスト（`*.db.test.ts`）は `pnpm test:db` で実行します。テスト専用の DB（`daily_report_test`）を使い、
   データベース名が `_test` で終わらない場合は実行を拒否します。通常の `pnpm test` は DB を必要としません。
