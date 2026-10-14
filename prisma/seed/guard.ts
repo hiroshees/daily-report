@@ -13,7 +13,15 @@ export function assertSeedAllowed(env: Record<string, string | undefined>): void
     throw new Error('DATABASE_URL が設定されていません。')
   }
 
-  const host = new URL(databaseUrl).hostname
+  let host: string
+  try {
+    host = new URL(databaseUrl).hostname
+  } catch {
+    // 接続文字列にはパスワードが含まれるため、値そのものはメッセージに出さない
+    throw new Error(
+      'DATABASE_URL の形式が正しくありません。パスワードに記号が含まれる場合は URL エンコードしてください。',
+    )
+  }
   const isLocal = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(host)
   if (!isLocal && env.SEED_ALLOW_REMOTE !== 'true') {
     throw new Error(

@@ -1,4 +1,4 @@
-import { generateSeedData, todayInJst } from '../../prisma/seed/data'
+import { generateSeedData, subtractMonths, todayInJst } from '../../prisma/seed/data'
 
 const BASE_DATE = '2025-07-28'
 const data = generateSeedData({ baseDate: BASE_DATE, passwordHash: 'hash' })
@@ -105,5 +105,43 @@ describe('todayInJst', () => {
   it('UTC の日付が変わる前でも JST の日付を返す', () => {
     expect(todayInJst(new Date('2025-07-27T16:00:00Z'))).toBe('2025-07-28')
     expect(todayInJst(new Date('2025-07-27T14:59:00Z'))).toBe('2025-07-27')
+  })
+})
+
+describe('subtractMonths', () => {
+  const iso = (date: string, months: number) =>
+    subtractMonths(new Date(`${date}T00:00:00Z`), months)
+      .toISOString()
+      .slice(0, 10)
+
+  it('同じ日がある月はそのまま n ヶ月前の同じ日を返す', () => {
+    expect(iso('2025-07-28', 3)).toBe('2025-04-28')
+    expect(iso('2025-08-31', 3)).toBe('2025-05-31')
+  })
+
+  it('同じ日がない月は月末に丸める（繰り上がらない）', () => {
+    expect(iso('2025-05-31', 3)).toBe('2025-02-28')
+    expect(iso('2024-05-31', 3)).toBe('2024-02-29') // うるう年
+    expect(iso('2025-03-31', 1)).toBe('2025-02-28')
+  })
+
+  it('年をまたぐ場合も正しい', () => {
+    expect(iso('2025-01-31', 3)).toBe('2024-10-31')
+    expect(iso('2025-03-31', 3)).toBe('2024-12-31')
+  })
+})
+
+describe('generateSeedData（月末の基準日）', () => {
+  it.each([
+    ['2025-05-31', '2025-02-28'],
+    ['2024-05-31', '2024-02-29'],
+    ['2025-03-31', '2024-12-31'],
+  ])('基準日 %s でも期間が短くならず %s から始まる', (baseDate, start) => {
+    const { reports } = generateSeedData({ baseDate, passwordHash: 'hash' })
+    const dates = new Set(reports.map((r) => r.reportDate.toISOString().slice(0, 10)))
+
+    // 開始日は営業日なので、10名のうち誰かの日報が必ずある
+    expect(dates.has(start)).toBe(true)
+    expect([...dates].every((d) => d >= start && d < baseDate)).toBe(true)
   })
 })

@@ -144,11 +144,23 @@ export function todayInJst(now = new Date()): string {
   return new Date(now.getTime() + JST_OFFSET_MS).toISOString().slice(0, 10)
 }
 
+/**
+ * n ヶ月前の同じ日を返す。その月に同じ日がない場合は月末に丸める（例: 5/31 の3ヶ月前は 2/28）。
+ * setUTCMonth をそのまま使うと 2/31 → 3/3 のように繰り上がり、期間が短くなってしまう。
+ */
+export function subtractMonths(date: Date, months: number): Date {
+  const firstOfTarget = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - months, 1))
+  const lastDay = new Date(
+    Date.UTC(firstOfTarget.getUTCFullYear(), firstOfTarget.getUTCMonth() + 1, 0),
+  ).getUTCDate()
+  firstOfTarget.setUTCDate(Math.min(date.getUTCDate(), lastDay))
+  return firstOfTarget
+}
+
 /** 基準日の「前日」から過去3ヶ月分の営業日（月〜金）を古い順に返す。基準日（当日）は含めない */
 function businessDays(baseDate: string): Date[] {
   const end = new Date(parseDate(baseDate).getTime() - DAY_MS)
-  const start = parseDate(baseDate)
-  start.setUTCMonth(start.getUTCMonth() - 3)
+  const start = subtractMonths(parseDate(baseDate), 3)
 
   const days: Date[] = []
   for (let d = start; d <= end; d = new Date(d.getTime() + DAY_MS)) {

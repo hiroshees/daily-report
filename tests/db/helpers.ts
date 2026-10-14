@@ -1,10 +1,9 @@
 import { prisma } from '@/lib/prisma'
+import { truncateAllTables } from '../../prisma/seed/db'
 
 /** 全テーブルを空にして採番もリセットする（テストの独立性を保つ） */
-export async function resetDatabase() {
-  await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "manager_comment", "visit_record", "daily_report", "customer", "sales_person" RESTART IDENTITY CASCADE',
-  )
+export function resetDatabase() {
+  return truncateAllTables(prisma)
 }
 
 export function createSalesPerson(overrides: { email?: string; isManager?: boolean } = {}) {
