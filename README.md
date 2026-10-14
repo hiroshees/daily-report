@@ -31,6 +31,8 @@ pnpm dev               # http://localhost:3000
 ```
 
 環境変数は `.env.example` を参照してください（DB 接続情報、JWT の設定）。
+認証の実装（#7, #8）までは、`.env` に `DEV_STUB_USER=member`（一般）または `manager`（管理者）を設定すると、
+ログイン状態を仮定して認証後の画面を確認できます（開発モードのみ有効）。
 データベースのセットアップは Prisma スキーマ導入後（#3）に追記します。
 
 ## スクリプト
@@ -55,7 +57,7 @@ pnpm dev               # http://localhost:3000
 daily-report/
 ├── src/
 │   ├── app/                 # Next.js App Router（ページ・Route Handler）
-│   ├── components/          # UI コンポーネント
+│   ├── components/          # UI コンポーネント（ui/: shadcn/ui, layout/: ヘッダー等, common/: 共通表示）
 │   ├── lib/                 # 共通ユーティリティ（Prisma Client など）
 │   ├── schemas/             # Zod スキーマ（API の入出力・OpenAPI 生成元）
 │   └── server/
