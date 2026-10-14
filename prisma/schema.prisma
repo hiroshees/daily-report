@@ -1,0 +1,110 @@
+// 営業日報システム DB スキーマ（doc/ER_DIAGRAM.md 準拠）
+// 削除ポリシー（CLAUDE.md 5.1.1）:
+//   - 営業担当者・顧客は参照されていれば削除不可（Restrict）。論理削除は行わない
+//   - 日報を削除したときは、その訪問記録・コメントも削除する（Cascade）
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // アプリ実行用（Neon ではプール接続）
+  url       = env("DATABASE_URL")
+  // マイグレーション用（直接接続）
+  directUrl = env("DIRECT_URL")
+}
+
+/// 営業マスタ（営業担当者・管理者）
+model SalesPerson {
+  id           Int      @id @default(autoincrement()) @map("sales_person_id")
+  name         String   @db.VarChar(100)
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash")
+  department   String   @db.VarChar(100)
+  isManager    Boolean  @default(false) @map("is_manager")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  reports  DailyReport[]
+  comments ManagerComment[]
+
+  @@map("sales_person")
+}
+
+/// 顧客マスタ
+model Customer {
+  id            Int      @id @default(autoincrement()) @map("customer_id")
+  companyName   String   @map("company_name") @db.VarChar(200)
+  // 会社名以外の必須/任意は未確定（#27）。確定するまでは任意としておく
+  contactPerson String?  @map("contact_person") @db.VarChar(100)
+  phone         String?  @db.VarChar(30)
+  email         String?  @db.VarChar(255)
+  address       String?  @db.VarChar(500)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  visits VisitRecord[]
+
+  @@index([companyName])
+  @@map("customer")
+}
+
+/// 日報（1人1日1件）
+model DailyReport {
+  id            Int      @id @default(autoincrement()) @map("report_id")
+  salesPersonId Int      @map("sales_person_id")
+  reportDate    DateTime @map("report_date") @db.Date
+  /// 課題・相談事項
+  problem       String
+  /// 翌日の活動計画
+  plan          String
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  salesPerson SalesPerson      @relation(fields: [salesPersonId], references: [id], onDelete: Restrict)
+  visits      VisitRecord[]
+  comments    ManagerComment[]
+
+  // 同一担当者・同一日付の日報は1件まで。
+  // このユニークインデックスは (sales_person_id, report_date) の検索にもそのまま使える
+  @@unique([salesPersonId, reportDate])
+  // 期間検索（一覧）用
+  @@index([reportDate])
+  @@map("daily_report")
+}
+
+/// 訪問記録
+model VisitRecord {
+  id           Int       @id @default(autoincrement()) @map("visit_id")
+  reportId     Int       @map("report_id")
+  customerId   Int       @map("customer_id")
+  visitContent String    @map("visit_content")
+  /// 訪問時刻（任意）。日付部分は無視し、時刻（JST のローカル時刻）として扱う
+  visitTime    DateTime? @map("visit_time") @db.Time(0)
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  report   DailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  customer Customer    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([reportId])
+  @@index([customerId])
+  @@map("visit_record")
+}
+
+/// 上長コメント
+model ManagerComment {
+  id        Int      @id @default(autoincrement()) @map("comment_id")
+  reportId  Int      @map("report_id")
+  /// コメントした管理者（SalesPerson のうち is_manager = true。権限チェックはアプリ側で行う）
+  managerId Int      @map("manager_id")
+  comment   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  report  DailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  manager SalesPerson @relation(fields: [managerId], references: [id], onDelete: Restrict)
+
+  @@index([reportId])
+  @@index([managerId])
+  @@map("manager_comment")
+}

@@ -16,6 +16,7 @@
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
+    "test:db": "vitest run --config vitest.db.config.ts",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest watch",
@@ -36,7 +37,8 @@
     "perf:all": "pnpm run perf:db-seed && pnpm run perf:k6 && pnpm run perf:db-cleanup",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "postinstall": "prisma generate"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.0.0",

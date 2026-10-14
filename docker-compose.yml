@@ -1,0 +1,25 @@
+# ローカル開発用 PostgreSQL（本番は Neon）
+# 他の PostgreSQL と衝突しないよう、ホスト側のポートは 5433 を使う
+services:
+  db:
+    image: postgres:14
+    container_name: daily-report-db
+    environment:
+      POSTGRES_USER: daily_report
+      POSTGRES_PASSWORD: daily_report
+      POSTGRES_DB: daily_report
+      TZ: Asia/Tokyo
+    ports:
+      - '5433:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # 初回起動時のみ実行される（テスト用 DB の作成）
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U daily_report -d daily_report']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db-data:
