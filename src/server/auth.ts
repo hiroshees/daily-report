@@ -1,16 +1,19 @@
-import { getSessionUser, type SessionUser } from '@/lib/session'
+import type { SessionUser } from '@/lib/session'
 import { ApiError } from '@/server/errors'
+import { getSession } from '@/server/session'
 
-/** ログイン必須。未ログインなら 401 */
-export async function requireAuth(): Promise<SessionUser> {
-  const user = await getSessionUser()
-  if (!user) throw new ApiError('AUTH_UNAUTHORIZED')
-  return user
+/** ログイン必須。未ログイン・無効なトークンは 401、期限切れは `AUTH_TOKEN_EXPIRED`（401） */
+export async function requireAuth(request: Request): Promise<SessionUser> {
+  const session = await getSession(request.headers)
+  if (!session.ok) {
+    throw new ApiError(session.reason === 'expired' ? 'AUTH_TOKEN_EXPIRED' : 'AUTH_UNAUTHORIZED')
+  }
+  return session.user
 }
 
 /** 管理者のみ。未ログインなら 401、一般ユーザーなら 403 */
-export async function requireManager(): Promise<SessionUser> {
-  const user = await requireAuth()
+export async function requireManager(request: Request): Promise<SessionUser> {
+  const user = await requireAuth(request)
   if (!user.isManager) throw new ApiError('FORBIDDEN')
   return user
 }

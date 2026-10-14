@@ -12,10 +12,17 @@
   ],
   "components": {
     "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "session",
+        "description": "ログイン時に設定される HttpOnly Cookie（ブラウザ用）"
+      },
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT"
+        "bearerFormat": "JWT",
+        "description": "ログインのレスポンスの token（API クライアント用）"
       }
     },
     "schemas": {
@@ -25,6 +32,7 @@
           "token": {
             "type": "string",
             "minLength": 1,
+            "description": "Bearer トークン（API クライアント用）。ブラウザは Cookie で自動的に認証される",
             "example": "eyJhbGciOiJIUzI1NiIs..."
           },
           "expires_at": {
@@ -1098,7 +1106,7 @@
           "認証"
         ],
         "summary": "ログイン",
-        "description": "ログイン認証を行い、アクセストークンを発行する",
+        "description": "ログイン認証を行い、アクセストークン（JWT）を発行する。ブラウザ向けに HttpOnly Cookie（session）も設定する。メールアドレスの不在とパスワード違いは区別しない（どちらも 401）",
         "security": [],
         "requestBody": {
           "required": true,
@@ -1150,25 +1158,19 @@
           "認証"
         ],
         "summary": "ログアウト",
-        "description": "ログアウト処理（トークン無効化）",
+        "description": "トークンを失効させ、Cookie を削除する。ログイン状態でなくても 204 を返す（何度呼んでもよい）",
         "security": [
           {
+            "cookieAuth": []
+          },
+          {
             "bearerAuth": []
-          }
+          },
+          {}
         ],
         "responses": {
           "204": {
             "description": "ログアウト成功"
-          },
-          "401": {
-            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         }
       }
@@ -1180,6 +1182,9 @@
         ],
         "summary": "ログインユーザー情報取得",
         "security": [
+          {
+            "cookieAuth": []
+          },
           {
             "bearerAuth": []
           }
@@ -1215,6 +1220,9 @@
         ],
         "summary": "日報一覧取得",
         "security": [
+          {
+            "cookieAuth": []
+          },
           {
             "bearerAuth": []
           }
@@ -1337,6 +1345,9 @@
         "description": "日報と訪問記録を同時に作成する。同一担当者・同一日付の日報は 1 件まで（409）",
         "security": [
           {
+            "cookieAuth": []
+          },
+          {
             "bearerAuth": []
           }
         ],
@@ -1401,6 +1412,9 @@
         ],
         "summary": "日報詳細取得",
         "security": [
+          {
+            "cookieAuth": []
+          },
           {
             "bearerAuth": []
           }
@@ -1467,6 +1481,9 @@
         "summary": "日報更新",
         "description": "作成者本人のみ。訪問記録は差分更新（id あり=更新、id なし=新規、送られなかった既存分=削除）",
         "security": [
+          {
+            "cookieAuth": []
+          },
           {
             "bearerAuth": []
           }
@@ -1554,6 +1571,9 @@
         "description": "作成者本人のみ。訪問記録・コメントも削除される",
         "security": [
           {
+            "cookieAuth": []
+          },
+          {
             "bearerAuth": []
           }
         ],
@@ -1613,6 +1633,9 @@
         ],
         "summary": "コメント一覧取得",
         "security": [
+          {
+            "cookieAuth": []
+          },
           {
             "bearerAuth": []
           }
@@ -1680,6 +1703,9 @@
         "summary": "コメント作成",
         "description": "管理者のみ",
         "security": [
+          {
+            "cookieAuth": []
+          },
           {
             "bearerAuth": []
           }
@@ -1769,6 +1795,9 @@
         "description": "管理者のみ",
         "security": [
           {
+            "cookieAuth": []
+          },
+          {
             "bearerAuth": []
           }
         ],
@@ -1850,6 +1879,9 @@
         "description": "管理者のみ。メールアドレスが重複する場合は 409",
         "security": [
           {
+            "cookieAuth": []
+          },
+          {
             "bearerAuth": []
           }
         ],
@@ -1926,6 +1958,9 @@
         "description": "管理者のみ",
         "security": [
           {
+            "cookieAuth": []
+          },
+          {
             "bearerAuth": []
           }
         ],
@@ -1991,6 +2026,9 @@
         "summary": "営業担当者更新",
         "description": "管理者のみ",
         "security": [
+          {
+            "cookieAuth": []
+          },
           {
             "bearerAuth": []
           }
@@ -2088,6 +2126,9 @@
         "description": "管理者のみ。日報・コメントから参照されている場合、自分自身、最後の管理者は削除できない（409）",
         "security": [
           {
+            "cookieAuth": []
+          },
+          {
             "bearerAuth": []
           }
         ],
@@ -2157,6 +2198,9 @@
         ],
         "summary": "顧客一覧取得",
         "security": [
+          {
+            "cookieAuth": []
+          },
           {
             "bearerAuth": []
           }
@@ -2254,6 +2298,9 @@
         "description": "管理者のみ",
         "security": [
           {
+            "cookieAuth": []
+          },
+          {
             "bearerAuth": []
           }
         ],
@@ -2319,6 +2366,9 @@
         "summary": "顧客詳細取得",
         "security": [
           {
+            "cookieAuth": []
+          },
+          {
             "bearerAuth": []
           }
         ],
@@ -2374,6 +2424,9 @@
         "summary": "顧客更新",
         "description": "管理者のみ",
         "security": [
+          {
+            "cookieAuth": []
+          },
           {
             "bearerAuth": []
           }
@@ -2460,6 +2513,9 @@
         "summary": "顧客削除",
         "description": "管理者のみ。訪問記録から参照されている場合は削除できない（409）",
         "security": [
+          {
+            "cookieAuth": []
+          },
           {
             "bearerAuth": []
           }

@@ -9,6 +9,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // 認証（JWT）のテスト用。本物の秘密鍵は使わない
+    env: { JWT_SECRET: 'test-only-secret-test-only-secret-0123456789' },
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'tests/**/*.test.{ts,tsx}'],

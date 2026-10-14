@@ -9,7 +9,13 @@ describe('AppHeader', () => {
   it('タイトル・ユーザー名・ログアウトボタンを表示する', () => {
     render(
       <AppHeader
-        user={{ id: 1, name: '山田太郎', isManager: false }}
+        user={{
+          id: 1,
+          name: '山田太郎',
+          email: 'yamada@example.com',
+          department: '営業1課',
+          isManager: false,
+        }}
         logoutAction={logoutAction}
       />,
     )
@@ -25,7 +31,13 @@ describe('AppHeader', () => {
   it('一般ユーザーにはマスタ管理リンクを表示しない', () => {
     render(
       <AppHeader
-        user={{ id: 1, name: '山田太郎', isManager: false }}
+        user={{
+          id: 1,
+          name: '山田太郎',
+          email: 'yamada@example.com',
+          department: '営業1課',
+          isManager: false,
+        }}
         logoutAction={logoutAction}
       />,
     )
@@ -37,7 +49,16 @@ describe('AppHeader', () => {
 
   it('管理者にはマスタ管理リンクを表示する', () => {
     render(
-      <AppHeader user={{ id: 2, name: '田中部長', isManager: true }} logoutAction={logoutAction} />,
+      <AppHeader
+        user={{
+          id: 2,
+          name: '田中部長',
+          email: 'tanaka@example.com',
+          department: '営業1課',
+          isManager: true,
+        }}
+        logoutAction={logoutAction}
+      />,
     )
 
     expect(screen.getByRole('link', { name: '顧客マスタ' })).toHaveAttribute('href', '/customers')

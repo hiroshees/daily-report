@@ -1,15 +1,36 @@
 // @vitest-environment node
 import { z } from '@/schemas/zod'
-import { requireAuth } from '@/server/auth'
 import { ApiError, ERROR_MESSAGE, ERROR_STATUS, type ErrorCode } from '@/server/errors'
 import { defineRoute, MAX_BODY_BYTES, type RouteContext } from '@/server/http'
-import { getSessionUser } from '@/lib/session'
+import { getSession } from '@/server/session'
 
-vi.mock('@/lib/session', () => ({ getSessionUser: vi.fn() }))
+vi.mock('@/server/session', () => ({ getSession: vi.fn() }))
 
-const member = { id: 1, name: '山田太郎', isManager: false }
-const manager = { id: 2, name: '田中部長', isManager: true }
-const loginAs = (user: typeof member | null) => vi.mocked(getSessionUser).mockResolvedValue(user)
+const member = {
+  id: 1,
+  name: '山田太郎',
+  email: 'yamada@example.com',
+  department: '営業1課',
+  isManager: false,
+}
+const manager = {
+  id: 2,
+  name: '田中部長',
+  email: 'tanaka@example.com',
+  department: '営業1課',
+  isManager: true,
+}
+
+type Failure = 'missing' | 'expired' | 'invalid'
+/** ログイン状態を差し替える（null は未ログイン、文字列は認証に失敗した理由） */
+const loginAs = (user: typeof member | Failure | null) =>
+  vi
+    .mocked(getSession)
+    .mockResolvedValue(
+      user === null || typeof user === 'string'
+        ? { ok: false, reason: user ?? 'missing' }
+        : { ok: true, user, token: { jti: 'jti', expiresAt: new Date('2099-01-01') } },
+    )
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
@@ -230,7 +251,7 @@ describe('認証・認可', () => {
     const route = defineRoute({ auth: 'none', handler: ({ user }) => ({ user }) })
 
     expect(await (await get(route)).json()).toEqual({ user: null })
-    expect(getSessionUser).not.toHaveBeenCalled()
+    expect(getSession).not.toHaveBeenCalled()
   })
 
   it('認証は検証より先: 未ログインなら不正な入力でも 401（検証内容を教えない）', async () => {
@@ -243,9 +264,32 @@ describe('認証・認可', () => {
     expect((await response.json()).error.details).toBeUndefined()
   })
 
-  it('requireAuth: 未ログインなら AUTH_UNAUTHORIZED を投げる', async () => {
-    loginAs(null)
-    await expect(requireAuth()).rejects.toMatchObject({ code: 'AUTH_UNAUTHORIZED', status: 401 })
+  it('トークンの期限切れは AUTH_TOKEN_EXPIRED、それ以外の無効は AUTH_UNAUTHORIZED（どちらも 401）', async () => {
+    const route = defineRoute({ handler: () => ({}) })
+
+    loginAs('expired')
+    const expired = await get(route)
+    expect(expired.status).toBe(401)
+    expect((await expired.json()).error).toEqual({
+      code: 'AUTH_TOKEN_EXPIRED',
+      message: 'トークンの有効期限が切れています',
+    })
+
+    for (const reason of ['invalid', 'missing'] as const) {
+      loginAs(reason)
+      const response = await get(route)
+      expect(response.status).toBe(401)
+      expect((await response.json()).error.code).toBe('AUTH_UNAUTHORIZED')
+    }
+  })
+
+  it('ハンドラには Authorization / Cookie を含むリクエストのヘッダーで認証する', async () => {
+    const route = defineRoute({ handler: () => ({}) })
+
+    await get(route, '/api/v1/x', { Authorization: 'Bearer abc' })
+
+    const headers = vi.mocked(getSession).mock.calls[0]![0]
+    expect(headers.get('authorization')).toBe('Bearer abc')
   })
 })
 
@@ -479,5 +523,69 @@ describe('想定外の例外（500 INTERNAL_ERROR）', () => {
     await get(route)
 
     expect(consoleError).not.toHaveBeenCalled()
+  })
+})
+
+describe('CSRF 対策（Origin の検証）', () => {
+  const route = defineRoute({ handler: () => ({ ok: true }) })
+  const post = (headers: HeadersInit) =>
+    route(new Request('http://localhost:3000/api/v1/x', { method: 'POST', headers }), NO_PARAMS)
+
+  it('Origin が自分のホストと違う状態変更リクエストは 403', async () => {
+    const response = await post({ Origin: 'https://evil.example.com', Host: 'localhost:3000' })
+
+    expect(response.status).toBe(403)
+    expect((await response.json()).error.code).toBe('FORBIDDEN')
+  })
+
+  it('Origin が同じホストなら OK', async () => {
+    expect((await post({ Origin: 'http://localhost:3000', Host: 'localhost:3000' })).status).toBe(
+      200,
+    )
+  })
+
+  it('プロキシ経由は X-Forwarded-Host と比較する', async () => {
+    const headers = { Origin: 'https://app.example.com', Host: 'internal:3000' }
+
+    expect((await post({ ...headers, 'X-Forwarded-Host': 'app.example.com' })).status).toBe(200)
+    expect((await post({ ...headers, 'X-Forwarded-Host': 'other.example.com' })).status).toBe(403)
+  })
+
+  it('Origin が無いリクエスト（ブラウザ以外）は対象外', async () => {
+    expect((await post({ Host: 'localhost:3000' })).status).toBe(200)
+  })
+
+  it.each(['null', 'not a url'])('不正な Origin（%s）は 403', async (origin) => {
+    expect((await post({ Origin: origin, Host: 'localhost:3000' })).status).toBe(403)
+  })
+
+  it('GET は Origin が違っても検証しない（状態を変更しないため）', async () => {
+    const response = await route(
+      new Request('http://localhost:3000/api/v1/x', {
+        headers: { Origin: 'https://evil.example.com', Host: 'localhost:3000' },
+      }),
+      NO_PARAMS,
+    )
+    expect(response.status).toBe(200)
+  })
+
+  it('CSRF の拒否は認証より先に行う（他サイトからのリクエストでセッションを参照しない）', async () => {
+    await post({ Origin: 'https://evil.example.com', Host: 'localhost:3000' })
+    expect(getSession).not.toHaveBeenCalled()
+  })
+})
+
+describe('キャッシュ', () => {
+  it('全レスポンスに Cache-Control: no-store を付ける', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const ok = defineRoute({ handler: () => ({}) })
+    const bad = defineRoute({
+      handler: () => {
+        throw new Error('x')
+      },
+    })
+
+    expect((await get(ok)).headers.get('Cache-Control')).toBe('no-store')
+    expect((await get(bad)).headers.get('Cache-Control')).toBe('no-store')
   })
 })

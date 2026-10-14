@@ -34,8 +34,7 @@ pnpm dev                      # http://localhost:3000
 ```
 
 - 環境変数は `.env.local`（git 管理外）に設定します。項目は `.env.example` を参照してください（DB 接続情報、JWT の設定）。
-- 認証の実装（#7, #8）までは、`.env.local` に `DEV_STUB_USER=member`（一般）または `manager`（管理者）を設定すると、
-  ログイン状態を仮定して認証後の画面を確認できます（開発モードのみ有効）。
+- `JWT_SECRET` は 32 文字以上のランダム文字列にします（`openssl rand -base64 48`）。未設定・短い場合は起動時にエラーになります。
 - 本番・Preview の DB は Neon（Vercel Marketplace 経由）です。`DATABASE_URL` はプール接続、`DIRECT_URL` は直接接続（マイグレーション用）を設定します。
 
 ### データベース
@@ -70,7 +69,7 @@ pnpm dev                      # http://localhost:3000
 | 管理者 | `tanaka@example.com` | 田中 部長 |
 
 他に一般: `suzuki` / `sato` / `takahashi` / `ito` / `watanabe` / `kato` / `yoshida`、管理者: `kobayashi`（いずれも `@example.com`）。
-認証が実装される（#7）まではログインできません。
+ログイン API（`POST /api/v1/auth/login`）は利用できます。ログイン画面は #8 で実装します。
 
 ### API スキーマ（Zod → OpenAPI）
 
@@ -85,6 +84,31 @@ src/schemas/*.ts ──▶ openapi.json ──▶ src/lib/api-schema.d.ts ──
 - 実行し忘れると `pnpm test` の「生成物が最新であること」が失敗します。
 - Route Handler では `src/schemas/` の Zod スキーマで入力を検証し、エラーメッセージは画面定義書（`doc/SCREEN_DESIGN.md` 6 章）の形式に揃えています。
 - 文字数は**コードポイント単位**で数えます（絵文字を 2 文字として数えません）。
+
+### 認証
+
+JWT を使い、トークンの保持方式は **HttpOnly Cookie**（ブラウザ）と **Bearer**（API クライアント）の両方に対応しています。
+
+| 項目         | 内容                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Cookie       | `session`。`HttpOnly`（JavaScript から読めない）・`SameSite=Lax`・本番は `Secure`                                                     |
+| トークン     | HS256 の JWT（`jose`）。ペイロードは `sub`（ユーザー ID）・`jti`・`iss`・`iat`・`exp` のみ。有効期間は `JWT_EXPIRES_IN`（既定 24h）   |
+| 毎回の確認   | 署名・期限に加え、DB で「ユーザーが存在するか」「失効していないか」を確認。管理者フラグの変更やユーザー削除が即時に反映される         |
+| ログアウト   | トークンの `jti` を失効リスト（`revoked_token`）に登録し、Cookie を削除。他の端末のトークンには影響しない。期限切れの記録は自動で削除 |
+| CSRF         | `Origin` が自分のホストと違う状態変更リクエスト（POST/PUT/DELETE）は 403                                                              |
+| ログイン失敗 | メールアドレスが無い場合もパスワード違いと同じ応答・同じ処理時間（ユーザーの有無を推測されない）                                      |
+
+- API: `POST /api/v1/auth/login`・`POST /api/v1/auth/logout`・`GET /api/v1/auth/me`
+- Server Component では `getSessionUser()`、Route Handler では `requireAuth(request)` / `requireManager(request)` を使います。
+- ログイン画面は #8 で実装します。それまでは、ブラウザの開発者ツールのコンソールで次を実行するとログインできます（シードのアカウント）。
+
+```js
+await fetch('/api/v1/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email: 'tanaka@example.com', password: 'Test1234!' }),
+})
+```
 
 ### Route Handler の書き方
 
@@ -142,7 +166,11 @@ daily-report/
 │   └── server/
 │       ├── http.ts          # defineRoute（Route Handler の共通処理）
 │       ├── errors.ts        # ApiError・エラーコードと HTTP ステータス
-│       ├── auth.ts          # 認可ヘルパー
+│       ├── auth.ts          # 認可ヘルパー（requireAuth / requireManager）
+│       ├── session.ts       # リクエストからログイン状態を判定
+│       ├── jwt.ts           # JWT の発行・検証
+│       ├── cookies.ts       # セッション Cookie の発行・取り出し
+│       ├── env.ts           # 認証の環境変数の検証
 │       ├── pagination.ts    # ページネーション
 │       ├── services/        # ビジネスロジック
 │       └── repositories/    # DB アクセス

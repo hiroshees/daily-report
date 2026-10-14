@@ -15,7 +15,12 @@ export default defineConfig({
     globals: true,
     include: ['src/**/*.db.test.ts', 'tests/**/*.db.test.ts'],
     globalSetup: ['./tests/db/global-setup.ts'],
-    env: { DATABASE_URL: testDatabaseUrl, DIRECT_URL: testDatabaseUrl },
+    env: {
+      DATABASE_URL: testDatabaseUrl,
+      DIRECT_URL: testDatabaseUrl,
+      // 認証（JWT）のテスト用。本物の秘密鍵は使わない
+      JWT_SECRET: 'test-only-secret-test-only-secret-0123456789',
+    },
     // 1つの DB を共有するため、ファイル間も直列で実行する
     fileParallelism: false,
   },

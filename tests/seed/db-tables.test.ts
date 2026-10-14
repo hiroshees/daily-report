@@ -8,6 +8,7 @@ describe('getModelTables', () => {
       { table: 'daily_report', serialColumn: 'report_id' },
       { table: 'visit_record', serialColumn: 'visit_id' },
       { table: 'manager_comment', serialColumn: 'comment_id' },
+      { table: 'revoked_token', serialColumn: null },
     ])
   })
 })

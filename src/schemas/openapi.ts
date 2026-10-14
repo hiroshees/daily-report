@@ -72,15 +72,25 @@ const errors = (...statuses: (keyof typeof errorResponses)[]): Responses =>
     ]),
   )
 
-const secured = { security: [{ bearerAuth: [] }] }
+const secured: { security: Record<string, string[]>[] } = {
+  security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+}
 
 export function createRegistry(): OpenAPIRegistry {
   const registry = new OpenAPIRegistry()
 
+  // ブラウザは HttpOnly Cookie、API クライアントは Bearer のどちらでも認証できる
+  registry.registerComponent('securitySchemes', 'cookieAuth', {
+    type: 'apiKey',
+    in: 'cookie',
+    name: 'session',
+    description: 'ログイン時に設定される HttpOnly Cookie（ブラウザ用）',
+  })
   registry.registerComponent('securitySchemes', 'bearerAuth', {
     type: 'http',
     scheme: 'bearer',
     bearerFormat: 'JWT',
+    description: 'ログインのレスポンスの token（API クライアント用）',
   })
 
   // ---- 認証 ----
@@ -89,7 +99,8 @@ export function createRegistry(): OpenAPIRegistry {
     path: '/auth/login',
     tags: ['認証'],
     summary: 'ログイン',
-    description: 'ログイン認証を行い、アクセストークンを発行する',
+    description:
+      'ログイン認証を行い、アクセストークン（JWT）を発行する。ブラウザ向けに HttpOnly Cookie（session）も設定する。メールアドレスの不在とパスワード違いは区別しない（どちらも 401）',
     security: [],
     request: { body: { required: true, ...jsonBody(LoginRequestSchema) } },
     responses: { ...ok('ログイン成功', LoginResponseSchema), ...errors(400, 401) },
@@ -99,9 +110,10 @@ export function createRegistry(): OpenAPIRegistry {
     path: '/auth/logout',
     tags: ['認証'],
     summary: 'ログアウト',
-    description: 'ログアウト処理（トークン無効化）',
-    ...secured,
-    responses: { ...noContent('ログアウト成功'), ...errors(401) },
+    description:
+      'トークンを失効させ、Cookie を削除する。ログイン状態でなくても 204 を返す（何度呼んでもよい）',
+    security: [...secured.security, {}],
+    responses: noContent('ログアウト成功'),
   })
   registry.registerPath({
     method: 'get',

@@ -1,11 +1,13 @@
 'use server'
 
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { SESSION_COOKIE } from '@/server/cookies'
+import { revokeSession } from '@/server/services/auth'
 
-/**
- * ログアウト。
- * TODO(#8): POST /auth/logout 相当の処理（トークン Cookie の削除・無効化）を行ってから遷移する。
- */
+/** ログアウト。トークンを失効させ、Cookie を削除してからログイン画面へ遷移する */
 export async function logoutAction() {
+  await revokeSession(await headers())
+  ;(await cookies()).delete(SESSION_COOKIE)
   redirect('/login')
 }

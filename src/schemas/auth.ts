@@ -21,7 +21,10 @@ export const LoginRequestSchema = z
 
 export const LoginResponseSchema = z
   .object({
-    token: requiredString('トークン').openapi({ example: 'eyJhbGciOiJIUzI1NiIs...' }),
+    token: requiredString('トークン').openapi({
+      description: 'Bearer トークン（API クライアント用）。ブラウザは Cookie で自動的に認証される',
+      example: 'eyJhbGciOiJIUzI1NiIs...',
+    }),
     expires_at: dateTimeField,
     user: CurrentUserSchema,
   })

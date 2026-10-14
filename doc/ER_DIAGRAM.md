@@ -54,6 +54,13 @@ erDiagram
         datetime created_at "作成日時"
     }
 
+    %% 失効トークン（ログアウト済みのログイントークン。他のテーブルとの関連はない）
+    REVOKED_TOKEN {
+        string jti PK "トークンID（JWTのjti）"
+        datetime expires_at "トークンの有効期限"
+        datetime revoked_at "失効日時"
+    }
+
     %% リレーションシップ
     SALES_PERSON ||--o{ DAILY_REPORT : "作成する"
     DAILY_REPORT ||--o{ VISIT_RECORD : "含む"

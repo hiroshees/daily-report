@@ -15,7 +15,7 @@ export interface paths {
         put?: never;
         /**
          * ログイン
-         * @description ログイン認証を行い、アクセストークンを発行する
+         * @description ログイン認証を行い、アクセストークン（JWT）を発行する。ブラウザ向けに HttpOnly Cookie（session）も設定する。メールアドレスの不在とパスワード違いは区別しない（どちらも 401）
          */
         post: {
             parameters: {
@@ -76,7 +76,7 @@ export interface paths {
         put?: never;
         /**
          * ログアウト
-         * @description ログアウト処理（トークン無効化）
+         * @description トークンを失効させ、Cookie を削除する。ログイン状態でなくても 204 を返す（何度呼んでもよい）
          */
         post: {
             parameters: {
@@ -93,15 +93,6 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
-                };
-                /** @description 認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED） */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
                 };
             };
         };
@@ -1212,7 +1203,10 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         LoginResponse: {
-            /** @example eyJhbGciOiJIUzI1NiIs... */
+            /**
+             * @description Bearer トークン（API クライアント用）。ブラウザは Cookie で自動的に認証される
+             * @example eyJhbGciOiJIUzI1NiIs...
+             */
             token: string;
             /**
              * Format: date-time

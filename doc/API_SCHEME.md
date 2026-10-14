@@ -5,7 +5,7 @@
 ### 1.1 基本情報
 
 - **ベースURL**: `https://api.sales-report.example.com/v1`
-- **認証方式**: Bearer Token（JWT）
+- **認証方式**: JWT。ブラウザは **HttpOnly Cookie**（`session`、`SameSite=Lax`、本番は `Secure`）、API クライアントは `Authorization: Bearer {token}`。どちらも受け付ける（両方ある場合は Bearer を優先）
 - **データ形式**: JSON
 - **文字コード**: UTF-8
 
@@ -39,7 +39,7 @@
 ### 2.1 リクエストヘッダー
 
 ```
-Authorization: Bearer {token}
+Authorization: Bearer {token}   # ブラウザは Cookie で自動的に認証される
 Content-Type: application/json
 Accept: application/json
 ```
@@ -102,7 +102,8 @@ X-Request-Id: {request-id}
 
 #### POST /auth/login
 
-ログイン認証を行い、アクセストークンを発行する
+ログイン認証を行い、アクセストークンを発行する。レスポンスの `token` は API クライアント用で、ブラウザには同時に HttpOnly Cookie（`session`）が設定される。
+メールアドレスが存在しない場合とパスワードが違う場合は区別せず、どちらも `401 AUTH_INVALID_CREDENTIALS` を返す（ユーザーの有無を推測されないため）。
 
 **リクエスト**
 
@@ -131,7 +132,8 @@ X-Request-Id: {request-id}
 
 #### POST /auth/logout
 
-ログアウト処理（トークン無効化）
+ログアウト処理。トークンを失効させ（失効リストに登録）、Cookie を削除する。
+ログイン状態でなくても `204` を返す（何度呼んでもよい）。
 
 **レスポンス**
 
