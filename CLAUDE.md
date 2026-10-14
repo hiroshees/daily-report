@@ -113,9 +113,10 @@
 - バックアップ：日次
 - 稼働時間：平日8:00-20:00（メンテナンス時間を除く）
 
-## 8. 使用技術
+## 7. 使用技術
 
 **言語:** TypeScript
+**パッケージ管理** pnpm
 **フレームワーク** Next.js(App Router)
 **UI** shadcn/ui
 **APIスキーマ定義** OpenAPI(Zodによる検証)
@@ -123,14 +124,14 @@
 **テスト** Vitest
 **デプロイ** Google Cloud Cloud Run
 
-## 7. 画面設計
+## 8. 画面設計
 
 @doc/SCREEN_DESIGN.md
 
-## 8. API仕様書
+## 9. API仕様書
 
 @doc/API_SCHEME.md
 
-## 9. テスト仕様書
+## 10. テスト仕様書
 
 @doc/TEST_DEFINITION.md
