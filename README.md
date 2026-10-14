@@ -72,6 +72,20 @@ pnpm dev                      # http://localhost:3000
 他に一般: `suzuki` / `sato` / `takahashi` / `ito` / `watanabe` / `kato` / `yoshida`、管理者: `kobayashi`（いずれも `@example.com`）。
 認証が実装される（#7）まではログインできません。
 
+### API スキーマ（Zod → OpenAPI）
+
+Zod スキーマ（`src/schemas/`）が唯一の情報源です。リクエストの検証、`openapi.json`、フロントの型付き API クライアントは、すべてここから作られます。
+
+```
+src/schemas/*.ts ──▶ openapi.json ──▶ src/lib/api-schema.d.ts ──▶ src/lib/api-client.ts（openapi-fetch）
+   （Zod: 検証・唯一の情報源）  （pnpm openapi:generate）    （pnpm api:types）
+```
+
+- スキーマや API を変更したら **`pnpm api:generate`** を実行し、`openapi.json` と `src/lib/api-schema.d.ts` を**一緒にコミット**します（自動生成物のため直接編集しない）。
+- 実行し忘れると `pnpm test` の「生成物が最新であること」が失敗します。
+- Route Handler では `src/schemas/` の Zod スキーマで入力を検証し、エラーメッセージは画面定義書（`doc/SCREEN_DESIGN.md` 6 章）の形式に揃えています。
+- 文字数は**コードポイント単位**で数えます（絵文字を 2 文字として数えません）。
+
 ## スクリプト
 
 | コマンド                                | 内容                                        |
@@ -100,6 +114,8 @@ daily-report/
 │   └── server/
 │       ├── services/        # ビジネスロジック
 │       └── repositories/    # DB アクセス
+├── scripts/                 # 生成スクリプト（OpenAPI・API 型）
+├── openapi.json             # 自動生成（pnpm api:generate）
 ├── prisma/                  # Prisma スキーマ・マイグレーション・シード
 ├── docker/                  # ローカル DB の初期化スクリプト（docker-compose.yml は直下）
 ├── tests/                   # E2E・結合テスト
