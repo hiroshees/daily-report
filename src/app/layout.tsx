@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
+import { Toaster } from '@/components/ui/sonner'
+import './globals.css'
 
 export const metadata: Metadata = {
   title: '営業日報システム',
@@ -10,7 +12,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     // ブラウザ拡張機能が html/body に属性を付与しても hydration 警告を出さない（この2要素のみ有効）
     <html lang="ja" suppressHydrationWarning>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        {children}
+        <Toaster richColors position="top-center" />
+      </body>
     </html>
   )
 }
