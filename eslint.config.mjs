@@ -14,6 +14,7 @@ const eslintConfig = [
       'coverage/**',
       'playwright-report/**',
       'next-env.d.ts',
+      'src/lib/api-schema.d.ts',
     ],
   },
   ...compat.config({

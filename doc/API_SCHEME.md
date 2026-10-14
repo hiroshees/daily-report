@@ -622,7 +622,9 @@ X-Request-Id: {request-id}
 | FORBIDDEN                | この操作を行う権限がありません                   |
 | VALIDATION_ERROR         | 入力値が不正です                                 |
 | DUPLICATE_REPORT         | 同じ日付の日報が既に存在します                   |
+| DUPLICATE_EMAIL          | このメールアドレスは既に登録されています         |
 | RESOURCE_IN_USE          | 他のデータから参照されているため削除できません   |
+| EDIT_PERIOD_EXPIRED      | 編集可能な期間を過ぎています                     |
 | NOT_FOUND                | リソースが見つかりません                         |
 | INTERNAL_ERROR           | サーバーエラーが発生しました                     |
 

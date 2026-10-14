@@ -1,0 +1,2528 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "営業日報システム API",
+    "version": "1.0.0",
+    "description": "営業担当者が日報を作成し、上長がコメントするための API。仕様は doc/API_SCHEME.md。"
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "example": "eyJhbGciOiJIUzI1NiIs..."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-07-27T09:00:00Z"
+          },
+          "user": {
+            "$ref": "#/components/schemas/CurrentUser"
+          }
+        },
+        "required": [
+          "token",
+          "expires_at",
+          "user"
+        ]
+      },
+      "CurrentUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "山田太郎"
+          },
+          "email": {
+            "type": "string",
+            "example": "yamada@example.com"
+          },
+          "department": {
+            "type": "string",
+            "example": "営業1課"
+          },
+          "is_manager": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "department",
+          "is_manager"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "$ref": "#/components/schemas/ErrorCode"
+              },
+              "message": {
+                "type": "string",
+                "example": "入力値が不正です"
+              },
+              "details": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "example": "problem"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "課題・相談は必須項目です"
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "message"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "AUTH_INVALID_CREDENTIALS",
+          "AUTH_TOKEN_EXPIRED",
+          "AUTH_UNAUTHORIZED",
+          "FORBIDDEN",
+          "VALIDATION_ERROR",
+          "DUPLICATE_REPORT",
+          "DUPLICATE_EMAIL",
+          "RESOURCE_IN_USE",
+          "EDIT_PERIOD_EXPIRED",
+          "NOT_FOUND",
+          "INTERNAL_ERROR"
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 255,
+            "example": "yamada@example.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "ReportListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "report_date": {
+            "type": "string",
+            "format": "date",
+            "example": "2025-07-27"
+          },
+          "sales_person": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "example": 1
+              },
+              "name": {
+                "type": "string",
+                "example": "山田太郎"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "visit_count": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 3
+          },
+          "has_comments": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-07-27T09:00:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "report_date",
+          "sales_person",
+          "visit_count",
+          "has_comments",
+          "created_at"
+        ]
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 100
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 20
+          },
+          "total_pages": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 5
+          }
+        },
+        "required": [
+          "total",
+          "page",
+          "per_page",
+          "total_pages"
+        ]
+      },
+      "ReportDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "report_date": {
+            "type": "string",
+            "format": "date",
+            "example": "2025-07-27"
+          },
+          "sales_person": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "example": 1
+              },
+              "name": {
+                "type": "string",
+                "example": "山田太郎"
+              },
+              "email": {
+                "type": "string",
+                "example": "yamada@example.com"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "email"
+            ]
+          },
+          "problem": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "string"
+          },
+          "visits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Visit"
+            }
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Comment"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-07-27T09:00:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-07-27T09:00:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "report_date",
+          "sales_person",
+          "problem",
+          "plan",
+          "visits",
+          "comments",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "Visit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "customer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "example": 1
+              },
+              "company_name": {
+                "type": "string",
+                "example": "ABC商事"
+              }
+            },
+            "required": [
+              "id",
+              "company_name"
+            ]
+          },
+          "visit_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "10:00"
+          },
+          "visit_content": {
+            "type": "string",
+            "example": "新商品の提案を実施..."
+          }
+        },
+        "required": [
+          "id",
+          "customer",
+          "visit_time",
+          "visit_content"
+        ]
+      },
+      "Comment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "manager": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "example": 1
+              },
+              "name": {
+                "type": "string",
+                "example": "田中部長"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "example": "新規開拓については明日相談しましょう。"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-07-27T09:00:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "manager",
+          "comment",
+          "created_at"
+        ]
+      },
+      "ReportCreateResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "report_date": {
+            "type": "string",
+            "format": "date",
+            "example": "2025-07-27"
+          },
+          "sales_person_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "problem": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-07-27T09:00:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "report_date",
+          "sales_person_id",
+          "problem",
+          "plan",
+          "created_at"
+        ]
+      },
+      "ReportCreateRequest": {
+        "type": "object",
+        "properties": {
+          "report_date": {
+            "type": "string",
+            "format": "date",
+            "example": "2025-07-27"
+          },
+          "problem": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "plan": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "visits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisitCreateInput"
+            }
+          }
+        },
+        "required": [
+          "report_date",
+          "problem",
+          "plan",
+          "visits"
+        ]
+      },
+      "VisitCreateInput": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1,
+            "description": "顧客ID"
+          },
+          "visit_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "example": "10:00"
+          },
+          "visit_content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "customer_id",
+          "visit_content"
+        ]
+      },
+      "ReportUpdateResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "report_date": {
+            "type": "string",
+            "format": "date",
+            "example": "2025-07-27"
+          },
+          "sales_person_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "problem": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-07-27T09:00:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "report_date",
+          "sales_person_id",
+          "problem",
+          "plan",
+          "updated_at"
+        ]
+      },
+      "ReportUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "problem": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "plan": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "visits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisitUpdateInput"
+            }
+          }
+        },
+        "required": [
+          "problem",
+          "plan",
+          "visits"
+        ]
+      },
+      "VisitUpdateInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1,
+            "description": "既存の訪問記録ID（新規は省略）"
+          },
+          "customer_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1,
+            "description": "顧客ID"
+          },
+          "visit_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "example": "10:00"
+          },
+          "visit_content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "customer_id",
+          "visit_content"
+        ]
+      },
+      "CommentCreateResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "report_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "manager_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "comment": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-07-27T09:00:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "report_id",
+          "manager_id",
+          "comment",
+          "created_at"
+        ]
+      },
+      "CommentCreateRequest": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "comment"
+        ]
+      },
+      "SalesPerson": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "山田太郎"
+          },
+          "email": {
+            "type": "string",
+            "example": "yamada@example.com"
+          },
+          "department": {
+            "type": "string",
+            "example": "営業1課"
+          },
+          "is_manager": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "department",
+          "is_manager"
+        ]
+      },
+      "SalesPersonDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SalesPerson"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2025-07-27T09:00:00Z"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2025-07-27T09:00:00Z"
+              }
+            },
+            "required": [
+              "created_at",
+              "updated_at"
+            ]
+          }
+        ]
+      },
+      "SalesPersonCreateResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SalesPerson"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2025-07-27T09:00:00Z"
+              }
+            },
+            "required": [
+              "created_at"
+            ]
+          }
+        ]
+      },
+      "SalesPersonCreateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 255,
+            "example": "yamada@example.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8
+          },
+          "department": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "is_manager": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "password",
+          "department"
+        ]
+      },
+      "SalesPersonUpdateResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SalesPerson"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "updated_at": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2025-07-27T09:00:00Z"
+              }
+            },
+            "required": [
+              "updated_at"
+            ]
+          }
+        ]
+      },
+      "SalesPersonUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 255,
+            "example": "yamada@example.com"
+          },
+          "department": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "is_manager": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "department",
+          "is_manager"
+        ]
+      },
+      "CustomerSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "company_name": {
+            "type": "string",
+            "example": "ABC商事"
+          },
+          "contact_person": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "佐藤一郎"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "03-1234-5678"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "sato@abc.co.jp"
+          }
+        },
+        "required": [
+          "id",
+          "company_name",
+          "contact_person",
+          "phone",
+          "email"
+        ]
+      },
+      "Customer": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CustomerSummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "example": "東京都千代田区..."
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2025-07-27T09:00:00Z"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2025-07-27T09:00:00Z"
+              }
+            },
+            "required": [
+              "address",
+              "created_at",
+              "updated_at"
+            ]
+          }
+        ]
+      },
+      "CustomerCreateResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "company_name": {
+            "type": "string",
+            "example": "ABC商事"
+          },
+          "contact_person": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "佐藤一郎"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "03-1234-5678"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "sato@abc.co.jp"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "東京都千代田区..."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-07-27T09:00:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "company_name",
+          "contact_person",
+          "phone",
+          "email",
+          "address",
+          "created_at"
+        ]
+      },
+      "CustomerCreateRequest": {
+        "type": "object",
+        "properties": {
+          "company_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "contact_person": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 30
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email",
+            "maxLength": 255,
+            "example": "yamada@example.com"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "company_name"
+        ]
+      },
+      "CustomerUpdateResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "example": 1
+          },
+          "company_name": {
+            "type": "string",
+            "example": "ABC商事"
+          },
+          "contact_person": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "佐藤一郎"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "03-1234-5678"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "sato@abc.co.jp"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "東京都千代田区..."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-07-27T09:00:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "company_name",
+          "contact_person",
+          "phone",
+          "email",
+          "address",
+          "updated_at"
+        ]
+      },
+      "CustomerUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "company_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "contact_person": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 30
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email",
+            "maxLength": 255,
+            "example": "yamada@example.com"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "company_name"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "認証"
+        ],
+        "summary": "ログイン",
+        "description": "ログイン認証を行い、アクセストークンを発行する",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ログイン成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入力値が不正（VALIDATION_ERROR）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "認証"
+        ],
+        "summary": "ログアウト",
+        "description": "ログアウト処理（トークン無効化）",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "ログアウト成功"
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "認証"
+        ],
+        "summary": "ログインユーザー情報取得",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ログインユーザー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports": {
+      "get": {
+        "tags": [
+          "日報"
+        ],
+        "summary": "日報一覧取得",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "ページ番号"
+            },
+            "required": false,
+            "description": "ページ番号",
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "description": "1ページあたりの件数"
+            },
+            "required": false,
+            "description": "1ページあたりの件数",
+            "name": "per_page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2025-07-27",
+              "description": "開始日（含む）"
+            },
+            "required": false,
+            "description": "開始日（含む）",
+            "name": "start_date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2025-07-27",
+              "description": "終了日（含む）"
+            },
+            "required": false,
+            "description": "終了日（含む）",
+            "name": "end_date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "営業担当者ID（管理者のみ有効）"
+            },
+            "required": false,
+            "description": "営業担当者ID（管理者のみ有効）",
+            "name": "sales_person_id",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "日報一覧",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReportListItem"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "pagination"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入力値が不正（VALIDATION_ERROR）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "日報"
+        ],
+        "summary": "日報作成",
+        "description": "日報と訪問記録を同時に作成する。同一担当者・同一日付の日報は 1 件まで（409）",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "作成した日報",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入力値が不正（VALIDATION_ERROR）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "競合（DUPLICATE_REPORT / DUPLICATE_EMAIL / RESOURCE_IN_USE）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/{id}": {
+      "get": {
+        "tags": [
+          "日報"
+        ],
+        "summary": "日報詳細取得",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "example": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "日報詳細",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入力値が不正（VALIDATION_ERROR）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "リソースが存在しない（NOT_FOUND）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "日報"
+        ],
+        "summary": "日報更新",
+        "description": "作成者本人のみ。訪問記録は差分更新（id あり=更新、id なし=新規、送られなかった既存分=削除）",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "example": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新した日報",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportUpdateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入力値が不正（VALIDATION_ERROR）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "権限がない（FORBIDDEN）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "リソースが存在しない（NOT_FOUND）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "日報"
+        ],
+        "summary": "日報削除",
+        "description": "作成者本人のみ。訪問記録・コメントも削除される",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "example": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "削除成功"
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "権限がない（FORBIDDEN）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "リソースが存在しない（NOT_FOUND）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/{id}/comments": {
+      "get": {
+        "tags": [
+          "コメント"
+        ],
+        "summary": "コメント一覧取得",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "example": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "コメント一覧",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Comment"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "リソースが存在しない（NOT_FOUND）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "コメント"
+        ],
+        "summary": "コメント作成",
+        "description": "管理者のみ",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "example": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "作成したコメント",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入力値が不正（VALIDATION_ERROR）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "権限がない（FORBIDDEN）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "リソースが存在しない（NOT_FOUND）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sales-persons": {
+      "get": {
+        "tags": [
+          "営業担当者"
+        ],
+        "summary": "営業担当者一覧取得",
+        "description": "管理者のみ",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "部署名で絞り込み"
+            },
+            "required": false,
+            "description": "部署名で絞り込み",
+            "name": "department",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "description": "管理者フラグで絞り込み（true / false）"
+            },
+            "required": false,
+            "description": "管理者フラグで絞り込み（true / false）",
+            "name": "is_manager",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "営業担当者一覧",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SalesPerson"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "権限がない（FORBIDDEN）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "営業担当者"
+        ],
+        "summary": "営業担当者作成",
+        "description": "管理者のみ。メールアドレスが重複する場合は 409",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesPersonCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "作成した営業担当者",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesPersonCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入力値が不正（VALIDATION_ERROR）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "権限がない（FORBIDDEN）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "競合（DUPLICATE_REPORT / DUPLICATE_EMAIL / RESOURCE_IN_USE）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sales-persons/{id}": {
+      "get": {
+        "tags": [
+          "営業担当者"
+        ],
+        "summary": "営業担当者詳細取得",
+        "description": "管理者のみ",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "example": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "営業担当者詳細",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesPersonDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "権限がない（FORBIDDEN）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "リソースが存在しない（NOT_FOUND）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "営業担当者"
+        ],
+        "summary": "営業担当者更新",
+        "description": "管理者のみ",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "example": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesPersonUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新した営業担当者",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesPersonUpdateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入力値が不正（VALIDATION_ERROR）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "権限がない（FORBIDDEN）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "リソースが存在しない（NOT_FOUND）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "競合（DUPLICATE_REPORT / DUPLICATE_EMAIL / RESOURCE_IN_USE）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "営業担当者"
+        ],
+        "summary": "営業担当者削除",
+        "description": "管理者のみ。日報・コメントから参照されている場合、自分自身、最後の管理者は削除できない（409）",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "example": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "削除成功"
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "権限がない（FORBIDDEN）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "リソースが存在しない（NOT_FOUND）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "競合（DUPLICATE_REPORT / DUPLICATE_EMAIL / RESOURCE_IN_USE）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customers": {
+      "get": {
+        "tags": [
+          "顧客"
+        ],
+        "summary": "顧客一覧取得",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "ページ番号"
+            },
+            "required": false,
+            "description": "ページ番号",
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "description": "1ページあたりの件数"
+            },
+            "required": false,
+            "description": "1ページあたりの件数",
+            "name": "per_page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "会社名/担当者名で検索（部分一致）"
+            },
+            "required": false,
+            "description": "会社名/担当者名で検索（部分一致）",
+            "name": "search",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "顧客一覧",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CustomerSummary"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "pagination"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入力値が不正（VALIDATION_ERROR）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "顧客"
+        ],
+        "summary": "顧客作成",
+        "description": "管理者のみ",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "作成した顧客",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入力値が不正（VALIDATION_ERROR）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "権限がない（FORBIDDEN）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customers/{id}": {
+      "get": {
+        "tags": [
+          "顧客"
+        ],
+        "summary": "顧客詳細取得",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "example": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "顧客詳細",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "リソースが存在しない（NOT_FOUND）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "顧客"
+        ],
+        "summary": "顧客更新",
+        "description": "管理者のみ",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "example": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新した顧客",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerUpdateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入力値が不正（VALIDATION_ERROR）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "権限がない（FORBIDDEN）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "リソースが存在しない（NOT_FOUND）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "顧客"
+        ],
+        "summary": "顧客削除",
+        "description": "管理者のみ。訪問記録から参照されている場合は削除できない（409）",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "example": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "削除成功"
+          },
+          "401": {
+            "description": "認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "権限がない（FORBIDDEN）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "リソースが存在しない（NOT_FOUND）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "競合（DUPLICATE_REPORT / DUPLICATE_EMAIL / RESOURCE_IN_USE）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}
