@@ -8,8 +8,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ja">
-      <body>{children}</body>
+    // ブラウザ拡張機能が html/body に属性を付与しても hydration 警告を出さない（この2要素のみ有効）
+    <html lang="ja" suppressHydrationWarning>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   )
 }
