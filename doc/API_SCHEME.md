@@ -478,6 +478,8 @@ X-Request-Id: {request-id}
 
 営業担当者を削除（管理者のみ）
 
+日報・コメントから参照されている場合、自分自身、および最後の管理者は削除できない（409 `RESOURCE_IN_USE`）。
+
 **レスポンス**
 
 ```
@@ -602,6 +604,8 @@ X-Request-Id: {request-id}
 
 顧客を削除（管理者のみ）
 
+訪問記録から参照されている場合は削除できない（409 `RESOURCE_IN_USE`）。
+
 **レスポンス**
 
 ```
@@ -618,6 +622,7 @@ X-Request-Id: {request-id}
 | FORBIDDEN                | この操作を行う権限がありません                   |
 | VALIDATION_ERROR         | 入力値が不正です                                 |
 | DUPLICATE_REPORT         | 同じ日付の日報が既に存在します                   |
+| RESOURCE_IN_USE          | 他のデータから参照されているため削除できません   |
 | NOT_FOUND                | リソースが見つかりません                         |
 | INTERNAL_ERROR           | サーバーエラーが発生しました                     |
 

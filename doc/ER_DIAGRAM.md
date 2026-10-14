@@ -5,6 +5,7 @@ erDiagram
         int sales_person_id PK "営業担当者ID"
         string name "氏名"
         string email "メールアドレス"
+        string password_hash "パスワードハッシュ"
         string department "部署"
         boolean is_manager "管理者フラグ"
         datetime created_at "作成日時"
