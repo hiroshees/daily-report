@@ -55,3 +55,4 @@ export const SalesPersonUpdateResponseSchema = SalesPersonSchema.extend({
 
 export type SalesPersonCreateRequest = z.infer<typeof SalesPersonCreateRequestSchema>
 export type SalesPersonUpdateRequest = z.infer<typeof SalesPersonUpdateRequestSchema>
+export type SalesPersonListQuery = z.infer<typeof SalesPersonListQuerySchema>
