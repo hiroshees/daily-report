@@ -122,7 +122,8 @@
 **APIスキーマ定義** OpenAPI(Zodによる検証)
 **DBスキーマ定義** Prisma.js
 **テスト** Vitest
-**デプロイ** Google Cloud Cloud Run
+**デプロイ** Vercel
+**データベース** Neon (PostgreSQL、Vercel Marketplace経由)
 
 ## 8. 画面設計
 
