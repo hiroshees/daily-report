@@ -1,18 +1,20 @@
 import type { ReactNode } from 'react'
-import { redirect } from 'next/navigation'
+import { CurrentUserProvider } from '@/components/auth/current-user-provider'
 import { AppHeader } from '@/components/layout/app-header'
-import { getSessionUser } from '@/lib/session'
+import { requirePageUser } from '@/server/page-auth'
 import { logoutAction } from '@/app/(app)/actions'
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const user = await getSessionUser()
-  // TODO(#8): 未認証のリダイレクトは middleware で行う。ここは多重防御として残す
-  if (!user) redirect('/login')
+  // middleware（署名・期限）に加えて、DB でユーザーの存在と失効を確認する多重防御。
+  // ただしクライアント遷移ではレイアウトが再実行されないため、データを扱う各ページでも確認すること
+  const user = await requirePageUser()
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <AppHeader user={user} logoutAction={logoutAction} />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
-    </div>
+    <CurrentUserProvider user={user}>
+      <div className="flex min-h-dvh flex-col">
+        <AppHeader user={user} logoutAction={logoutAction} />
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
+      </div>
+    </CurrentUserProvider>
   )
 }

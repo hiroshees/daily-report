@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { errors, jwtVerify, SignJWT } from 'jose'
 import { getAuthEnv } from '@/server/env'
 
@@ -22,7 +21,8 @@ export async function signSessionToken(userId: number, now = new Date()): Promis
   const { secret, ttlSeconds } = getAuthEnv()
   const issuedAt = Math.floor(now.getTime() / 1000)
   const expiresAt = issuedAt + ttlSeconds
-  const jti = randomUUID()
+  // Web Crypto（Node / Edge のどちらでも使える）。middleware（Edge）からこのファイルを読み込むため、node:crypto は使わない
+  const jti = crypto.randomUUID()
 
   const token = await new SignJWT({})
     .setProtectedHeader({ alg: ALGORITHM })

@@ -69,7 +69,7 @@ pnpm dev                      # http://localhost:3000
 | 管理者 | `tanaka@example.com` | 田中 部長 |
 
 他に一般: `suzuki` / `sato` / `takahashi` / `ito` / `watanabe` / `kato` / `yoshida`、管理者: `kobayashi`（いずれも `@example.com`）。
-ログイン API（`POST /api/v1/auth/login`）は利用できます。ログイン画面は #8 で実装します。
+ログイン画面（`/login`）から、これらのアカウントでログインできます。
 
 ### git worktree で並行して作業する
 
@@ -119,15 +119,25 @@ JWT を使い、トークンの保持方式は **HttpOnly Cookie**（ブラウ�
 
 - API: `POST /api/v1/auth/login`・`POST /api/v1/auth/logout`・`GET /api/v1/auth/me`
 - Server Component では `getSessionUser()`、Route Handler では `requireAuth(request)` / `requireManager(request)` を使います。
-- ログイン画面は #8 で実装します。それまでは、ブラウザの開発者ツールのコンソールで次を実行するとログインできます（シードのアカウント）。
 
-```js
-await fetch('/api/v1/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email: 'tanaka@example.com', password: 'Test1234!' }),
-})
-```
+#### ログイン画面とアクセス制御
+
+- ログイン画面は `/login`（SC001）。メールアドレス・パスワードを入力して、シードのアカウントでログインできます。
+  入力が不正な間はログインボタンが押せず、ログイン失敗時は「メールアドレスまたはパスワードが正しくありません」を表示します。
+- **未ログインでページを開くと `/login?redirect=<元の URL>` に移動し、ログイン後に元の URL へ戻ります**（`src/middleware.ts`）。
+  遷移先は同一オリジンの相対パスだけに絞り込みます（`safeRedirectPath`。`//evil.com` や `/\evil.com` などは拒否）。
+- middleware は **JWT の署名と有効期限だけ**を確認します（Edge ランタイムでは DB が使えないため）。
+  ユーザーの存在・失効の確認は、ページ側で行います。**データを扱うページでは、レイアウトに頼らず、必ず次を呼んでください**
+  （クライアント遷移ではレイアウトが再実行されないため）。
+
+  | 目的                 | 呼び出し（`src/server/page-auth.ts`）                                                             |
+  | -------------------- | ------------------------------------------------------------------------------------------------- |
+  | ログイン必須のページ | `await requirePageUser()`（未ログインなら `/login` へ）                                           |
+  | 管理者専用のページ   | `const { allowed } = await requireManagerPage()`、`allowed` でなければ `<ForbiddenView />` を返す |
+
+- Client Component でログイン中のユーザーが必要な場合は `useCurrentUser()` を使います（認証後のレイアウトが `CurrentUserProvider` で渡します）。
+- ログイン済みで `/login` を開くと、遷移先（既定は `/reports`）へ移動します。この判定は middleware ではなくログイン画面のページで行います
+  （ログアウト済みのトークンが Cookie に残っていても、`/login` と一覧を行き来する無限リダイレクトにならないように）。
 
 ### Route Handler の書き方
 
