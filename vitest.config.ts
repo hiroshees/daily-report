@@ -15,7 +15,7 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'tests/**/*.test.{ts,tsx}'],
     // DB を使うテストは `pnpm test:db` で実行する
-    exclude: ['**/node_modules/**', '**/*.db.test.{ts,tsx}'],
+    exclude: ['**/node_modules/**', '.claude/**', '**/*.db.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],

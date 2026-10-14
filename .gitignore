@@ -48,6 +48,7 @@ Thumbs.db
 # vercel
 .vercel/
 
-# Claude Code (local settings)
+# Claude Code（ローカル設定と、リポジトリ内に作成した git worktree）
 .claude/settings.local.json
+.claude/worktrees/
 .playwright-mcp/
