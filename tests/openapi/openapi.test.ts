@@ -41,7 +41,7 @@ describe('OpenAPI ドキュメント', () => {
     expect([...ERROR_CODES].sort()).toEqual(documentedErrorCodes().sort())
   })
 
-  it('ログイン以外は Bearer 認証が必須', () => {
+  it('ログイン以外は Cookie または Bearer での認証が必須（ログアウトは任意）', () => {
     const operations = Object.entries(document.paths ?? {}).flatMap(([path, item]) =>
       Object.entries(item as Record<string, { security?: unknown[] }>).map(
         ([method, operation]) => ({
@@ -50,10 +50,12 @@ describe('OpenAPI ドキュメント', () => {
         }),
       ),
     )
+    const authenticated = [{ cookieAuth: [] }, { bearerAuth: [] }]
 
     for (const { key, security } of operations) {
       if (key === 'POST /auth/login') expect(security).toEqual([])
-      else expect(security, key).toEqual([{ bearerAuth: [] }])
+      else if (key === 'POST /auth/logout') expect(security).toEqual([...authenticated, {}])
+      else expect(security, key).toEqual(authenticated)
     }
   })
 })

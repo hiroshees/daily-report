@@ -108,3 +108,15 @@ model ManagerComment {
   @@index([managerId])
   @@map("manager_comment")
 }
+
+/// 失効したログイントークン（ログアウト済み）。JWT の jti を保存し、有効期限が切れたら不要になる
+model RevokedToken {
+  /// JWT の jti（トークンごとの一意な ID）
+  jti       String   @id @db.VarChar(64)
+  /// トークンの有効期限。これを過ぎたトークンは署名検証で弾かれるため、行は削除してよい
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime @default(now()) @map("revoked_at")
+
+  @@index([expiresAt])
+  @@map("revoked_token")
+}

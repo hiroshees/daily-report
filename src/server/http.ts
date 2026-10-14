@@ -47,6 +47,29 @@ type RouteConfig<
   }) => unknown
 }
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+
+/**
+ * CSRF 対策。Cookie でログインするため、他サイトから送られた状態変更リクエストを拒否する。
+ * ブラウザは `Origin` を付けて送るので、自分のホストと違えば 403。
+ * `Origin` が無いリクエスト（API クライアントなど、ブラウザ以外）は対象外（Cookie の自動送信が起きない）。
+ */
+export function assertSameOrigin(request: Request): void {
+  if (SAFE_METHODS.has(request.method.toUpperCase())) return
+
+  const origin = request.headers.get('origin')
+  if (!origin) return
+
+  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
+  let originHost: string | null = null
+  try {
+    originHost = new URL(origin).host
+  } catch {
+    // 不正な Origin（"null" を含む）は拒否する
+  }
+  if (!host || originHost !== host) throw new ApiError('FORBIDDEN')
+}
+
 /** 受信した X-Request-Id を引き継ぐ。無い・不正な形式なら UUID を生成する */
 export function resolveRequestId(request: Request): string {
   const incoming = request.headers.get('x-request-id')
@@ -57,6 +80,8 @@ export function resolveRequestId(request: Request): string {
 function responseHeaders(requestId: string, extra?: HeadersInit): Headers {
   const headers = new Headers(extra)
   if (!headers.has('Content-Type')) headers.set('Content-Type', JSON_CONTENT_TYPE)
+  // ユーザー情報やトークンを含みうるため、ブラウザや中継サーバーにキャッシュさせない
+  if (!headers.has('Cache-Control')) headers.set('Cache-Control', 'no-store')
   headers.set('X-Request-Id', requestId)
   return headers
 }
@@ -182,10 +207,16 @@ export function defineRoute<
     const requestId = resolveRequestId(request)
 
     try {
+      assertSameOrigin(request)
+
       // 認証を先に行い、未認証の相手にスキーマの詳細（検証エラー）を教えない
       const auth = config.auth ?? 'user'
       const user =
-        auth === 'manager' ? await requireManager() : auth === 'user' ? await requireAuth() : null
+        auth === 'manager'
+          ? await requireManager(request)
+          : auth === 'user'
+            ? await requireAuth(request)
+            : null
 
       const params = parse(config.params as P, await context?.params)
       const query = parse(
