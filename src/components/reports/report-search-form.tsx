@@ -31,7 +31,13 @@ export function ReportSearchForm({ initial, salesPersons }: ReportSearchFormProp
   const id = useId()
   const [startDate, setStartDate] = useState(initial.start_date ?? '')
   const [endDate, setEndDate] = useState(initial.end_date ?? '')
-  const [salesPersonId, setSalesPersonId] = useState(initial.sales_person_id ?? ALL)
+  // 一覧にない担当者 ID（URL の手入力など）は「全員」として扱う
+  const [salesPersonId, setSalesPersonId] = useState(
+    initial.sales_person_id && salesPersons?.some((p) => String(p.id) === initial.sales_person_id)
+      ? initial.sales_person_id
+      : ALL,
+  )
+  const errorId = `${id}-error`
 
   // YYYY-MM-DD は文字列比較で大小が判定できる
   const dateOrderError = startDate && endDate && startDate > endDate ? DATE_ORDER_ERROR : null
@@ -60,6 +66,7 @@ export function ReportSearchForm({ initial, salesPersons }: ReportSearchFormProp
             value={startDate}
             max={endDate || undefined}
             aria-invalid={dateOrderError ? true : undefined}
+            aria-describedby={dateOrderError ? errorId : undefined}
             onChange={(e) => setStartDate(e.target.value)}
             className="w-44"
           />
@@ -75,6 +82,7 @@ export function ReportSearchForm({ initial, salesPersons }: ReportSearchFormProp
             value={endDate}
             min={startDate || undefined}
             aria-invalid={dateOrderError ? true : undefined}
+            aria-describedby={dateOrderError ? errorId : undefined}
             onChange={(e) => setEndDate(e.target.value)}
             className="w-44"
           />
@@ -99,11 +107,15 @@ export function ReportSearchForm({ initial, salesPersons }: ReportSearchFormProp
           </div>
         )}
 
-        <Button type="submit" disabled={Boolean(dateOrderError)}>
+        <Button
+          type="submit"
+          disabled={Boolean(dateOrderError)}
+          aria-describedby={dateOrderError ? errorId : undefined}
+        >
           検索
         </Button>
       </div>
-      <FormError message={dateOrderError} />
+      <FormError id={errorId} message={dateOrderError} />
     </form>
   )
 }
