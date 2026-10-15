@@ -1542,7 +1542,7 @@
             }
           },
           "403": {
-            "description": "権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED）",
+            "description": "権限がない・編集期限超過（FORBIDDEN / EDIT_PERIOD_EXPIRED）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1604,7 +1604,7 @@
             }
           },
           "403": {
-            "description": "権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED）",
+            "description": "権限がない（FORBIDDEN）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1764,7 +1764,7 @@
             }
           },
           "403": {
-            "description": "権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED）",
+            "description": "権限がない（FORBIDDEN）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1860,7 +1860,7 @@
             }
           },
           "403": {
-            "description": "権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED）",
+            "description": "権限がない（FORBIDDEN）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1927,7 +1927,7 @@
             }
           },
           "403": {
-            "description": "権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED）",
+            "description": "権限がない（FORBIDDEN）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1998,7 +1998,7 @@
             }
           },
           "403": {
-            "description": "権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED）",
+            "description": "権限がない（FORBIDDEN）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2087,7 +2087,7 @@
             }
           },
           "403": {
-            "description": "権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED）",
+            "description": "権限がない（FORBIDDEN）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2159,7 +2159,7 @@
             }
           },
           "403": {
-            "description": "権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED）",
+            "description": "権限がない（FORBIDDEN）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2346,7 +2346,7 @@
             }
           },
           "403": {
-            "description": "権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED）",
+            "description": "権限がない（FORBIDDEN）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2485,7 +2485,7 @@
             }
           },
           "403": {
-            "description": "権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED）",
+            "description": "権限がない（FORBIDDEN）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2547,7 +2547,7 @@
             }
           },
           "403": {
-            "description": "権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED）",
+            "description": "権限がない（FORBIDDEN）",
             "content": {
               "application/json": {
                 "schema": {

@@ -65,7 +65,7 @@ export function getReportEditLimitDays(
   if (!raw) return DEFAULT_REPORT_EDIT_LIMIT_DAYS
   if (!/^\d+$/.test(raw)) {
     throw new Error(
-      '環境変数が正しくありません:\n- REPORT_EDIT_LIMIT_DAYS は 0 以上の整数で指定してください',
+      `環境変数が正しくありません:\n- REPORT_EDIT_LIMIT_DAYS は 0 以上の整数で指定してください（現在の値: "${raw}"）`,
     )
   }
   return Number(raw)

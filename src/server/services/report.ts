@@ -132,8 +132,8 @@ const visitIdInvalid = (index: number, message: string) =>
 const DAY_MS = 24 * 60 * 60 * 1000
 
 /** 本人の日報だけを操作対象にする。日報が無ければ 404、他人のものなら 403（管理者も同様） */
-async function findOwnReport(id: number, userId: number) {
-  const report = await prisma.dailyReport.findUnique({
+async function findOwnReport(tx: Prisma.TransactionClient, id: number, userId: number) {
+  const report = await tx.dailyReport.findUnique({
     where: { id },
     select: { id: true, salesPersonId: true, createdAt: true },
   })
@@ -142,50 +142,67 @@ async function findOwnReport(id: number, userId: number) {
   return report
 }
 
+type VisitUpdateInput = ReportUpdateRequest['visits'][number]
+
+const visitData = (visit: VisitUpdateInput) => ({
+  customerId: visit.customer_id,
+  visitTime: visit.visit_time ? toTimeDate(visit.visit_time) : null,
+  visitContent: visit.visit_content,
+})
+
 /**
  * 日報と訪問記録を差分更新する（id あり=更新、id なし=新規、送られなかった既存分=削除）。
  * 日付と作成者は変更できない（スキーマに含めず、余分なキーは無視される）。
+ * 読み取り・権限・期限・訪問記録 ID の検証から更新までを 1 トランザクションで行う。
  * TODO(#27): 編集可能期間は未確定のため、作成日時から REPORT_EDIT_LIMIT_DAYS 日（既定 7 日）で暫定判定している
- * TODO: 同時編集の上書き防止（updated_at を使った楽観ロック）は任意項目のため未実装
+ * TODO(#27): 楽観ロック（updated_at による同時編集の検出）は仕様変更になるため未実装。
+ *   同時 PUT は後勝ち（既知の制約）。ただし検証と更新が同一トランザクションなので二重作成は起きにくい
  */
 export async function updateReport(id: number, userId: number, input: ReportUpdateRequest) {
-  const report = await findOwnReport(id, userId)
-  const limitMs = getReportEditLimitDays() * DAY_MS
-  if (Date.now() - report.createdAt.getTime() > limitMs) throw new ApiError('EDIT_PERIOD_EXPIRED')
-
-  // 既存の訪問記録 id は、この日報に属するものだけ指定できる（他日報の id 混入・重複指定は 400）
-  const owned = await prisma.visitRecord.findMany({ where: { reportId: id }, select: { id: true } })
-  const ownedIds = new Set(owned.map((visit) => visit.id))
-  const seen = new Set<number>()
-  input.visits.forEach((visit, index) => {
-    if (visit.id === undefined) return
-    if (!ownedIds.has(visit.id)) throw visitIdInvalid(index, 'この日報の訪問記録ではありません')
-    if (seen.has(visit.id)) throw visitIdInvalid(index, '訪問記録 ID が重複しています')
-    seen.add(visit.id)
-  })
+  // 顧客の存在確認はトランザクション外（最終的な整合性は外部キー制約が保証し、違反は下で 400 に変換する）
   await assertCustomersExist(input.visits)
-
-  const data = (visit: ReportUpdateRequest['visits'][number]) => ({
-    customerId: visit.customer_id,
-    visitTime: visit.visit_time ? toTimeDate(visit.visit_time) : null,
-    visitContent: visit.visit_content,
-  })
 
   try {
     const updated = await prisma.$transaction(async (tx) => {
+      const report = await findOwnReport(tx, id, userId)
+      const limitMs = getReportEditLimitDays() * DAY_MS
+      if (Date.now() - report.createdAt.getTime() > limitMs) {
+        throw new ApiError('EDIT_PERIOD_EXPIRED')
+      }
+
+      // 既存の訪問記録 id は、この日報に属するものだけ指定できる（他日報の id 混入・重複指定は 400）
+      const owned = await tx.visitRecord.findMany({
+        where: { reportId: id },
+        select: { id: true },
+      })
+      const ownedIds = new Set(owned.map((visit) => visit.id))
+      const keptIds = new Set<number>()
+      input.visits.forEach((visit, index) => {
+        if (visit.id === undefined) return
+        if (!ownedIds.has(visit.id)) throw visitIdInvalid(index, 'この日報の訪問記録ではありません')
+        if (keptIds.has(visit.id)) throw visitIdInvalid(index, '訪問記録 ID が重複しています')
+        keptIds.add(visit.id)
+      })
+
       // updated_at は @updatedAt により更新のたびに自動で更新される
       const result = await tx.dailyReport.update({
         where: { id },
         data: { problem: input.problem, plan: input.plan },
       })
-      await tx.visitRecord.deleteMany({ where: { reportId: id, id: { notIn: [...seen] } } })
-      for (const visit of input.visits) {
-        if (visit.id === undefined) {
-          await tx.visitRecord.create({ data: { reportId: id, ...data(visit) } })
-        } else {
-          await tx.visitRecord.update({ where: { id: visit.id }, data: data(visit) })
-        }
-      }
+      await tx.visitRecord.deleteMany({ where: { reportId: id, id: { notIn: [...keptIds] } } })
+
+      // トランザクション内の接続は 1 本でクエリは順番に実行されるが、await の待ち合わせを減らせる
+      const existing = input.visits.filter((visit) => visit.id !== undefined)
+      await Promise.all(
+        existing.map((visit) =>
+          tx.visitRecord.update({ where: { id: visit.id }, data: visitData(visit) }),
+        ),
+      )
+      await tx.visitRecord.createMany({
+        data: input.visits
+          .filter((visit) => visit.id === undefined)
+          .map((visit) => ({ reportId: id, ...visitData(visit) })),
+      })
       return result
     })
     return {
@@ -206,12 +223,15 @@ export async function updateReport(id: number, userId: number, input: ReportUpda
 
 /**
  * 日報を削除する（訪問記録・コメントは DB の Cascade で削除される）。本人のみ。
+ * 存在・権限の確認と削除を 1 トランザクションで行う。
  * TODO(#27): 編集期限（EDIT_PERIOD_EXPIRED）を削除にも適用するかは未確定のため、現状は適用していない
  */
 export async function deleteReport(id: number, userId: number) {
-  await findOwnReport(id, userId)
   try {
-    await prisma.dailyReport.delete({ where: { id } })
+    await prisma.$transaction(async (tx) => {
+      await findOwnReport(tx, id, userId)
+      await tx.dailyReport.delete({ where: { id } })
+    })
   } catch (error) {
     // 確認後に同時削除された場合は 404 に揃える
     if (isPrismaError(error, 'P2025')) throw new ApiError('NOT_FOUND')

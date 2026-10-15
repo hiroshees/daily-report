@@ -151,15 +151,81 @@ describe('PUT /reports/{id}', () => {
   })
 
   it('REPORT_EDIT_LIMIT_DAYS で期限を変更できる', async () => {
+    const createdAt = (await prisma.dailyReport.findUniqueOrThrow({ where: { id: report.id } }))
+      .createdAt
     vi.stubEnv('REPORT_EDIT_LIMIT_DAYS', '0')
+    vi.useFakeTimers({ toFake: ['Date'], now: createdAt.getTime() + 1000 })
     try {
-      await new Promise((resolve) => setTimeout(resolve, 5))
       expect((await call('PUT', report.id, payload(), user)).body.error.code).toBe(
         'EDIT_PERIOD_EXPIRED',
       )
     } finally {
       vi.unstubAllEnvs()
     }
+  })
+
+  it('REPORT_EDIT_LIMIT_DAYS が不正な値なら 500 で、何も変更されない（値はレスポンスに出さない）', async () => {
+    vi.stubEnv('REPORT_EDIT_LIMIT_DAYS', 'abc')
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const { status, body } = await call('PUT', report.id, payload(), user)
+
+      expect(status).toBe(500)
+      expect(body.error.code).toBe('INTERNAL_ERROR')
+      expect(JSON.stringify(body)).not.toContain('abc')
+      expect(
+        (await prisma.dailyReport.findUniqueOrThrow({ where: { id: report.id } })).problem,
+      ).toBe('課題')
+    } finally {
+      errorLog.mockRestore()
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('既存の訪問記録の customer_id を変更できる', async () => {
+    const another = await createCustomer('XYZ商事')
+    const [first] = visitIds as [number, number]
+
+    const { status } = await call(
+      'PUT',
+      report.id,
+      payload({ visits: [visit({ id: first, customer_id: another.id })] }),
+      user,
+    )
+
+    expect(status).toBe(200)
+    expect((await prisma.visitRecord.findUniqueOrThrow({ where: { id: first } })).customerId).toBe(
+      another.id,
+    )
+  })
+
+  it('更新の途中（削除・更新の後）で失敗したら、同一トランザクション内の変更も全てロールバックされる', async () => {
+    // 事前の顧客存在確認をすり抜けさせ、訪問記録の更新時に外部キー違反を起こす
+    const original = prisma.customer.findMany.bind(prisma.customer)
+    const spy = vi
+      .spyOn(prisma.customer, 'findMany')
+      .mockResolvedValueOnce([{ id: 99999 }] as never)
+      .mockImplementation(original as never)
+    const [first] = visitIds as [number, number]
+    const { status, body } = await call(
+      'PUT',
+      report.id,
+      // 日報の更新と 2 件目の削除は成功した後、1 件目の更新で失敗する
+      payload({ visits: [visit({ id: first, customer_id: 99999 })] }),
+      user,
+    )
+    spy.mockImplementation(original as never)
+
+    expect(status).toBe(400)
+    expect(body.error.details).toEqual([
+      { field: 'visits', message: '指定された顧客が存在しません' },
+    ])
+    expect((await prisma.dailyReport.findUniqueOrThrow({ where: { id: report.id } })).problem).toBe(
+      '課題',
+    )
+    const visits = await prisma.visitRecord.findMany({ where: { reportId: report.id } })
+    expect(visits.map((v) => v.visitContent).sort()).toEqual(['A', 'B'])
+    expect(visits.every((v) => v.customerId === customer.id)).toBe(true)
   })
 
   it('他日報の visit_id が混入すると 400 で、何も変更されない', async () => {
@@ -262,6 +328,15 @@ describe('DELETE /reports/{id}', () => {
       expect(body.error.code).toBe('FORBIDDEN')
     }
     expect(await prisma.dailyReport.count()).toBe(1)
+  })
+
+  it('編集期限を過ぎた日報でも削除できる（期限は編集のみ。#27 で確定）', async () => {
+    const createdAt = (await prisma.dailyReport.findUniqueOrThrow({ where: { id: report.id } }))
+      .createdAt
+    vi.useFakeTimers({ toFake: ['Date'], now: createdAt.getTime() + 365 * 24 * 60 * 60 * 1000 })
+
+    expect((await call('DELETE', report.id, undefined, user)).status).toBe(204)
+    expect(await prisma.dailyReport.count()).toBe(0)
   })
 
   it('存在しない日報は 404、未認証は 401', async () => {

@@ -69,7 +69,7 @@ describe('getReportEditLimitDays（日報の編集可能日数）', () => {
 
   it.each(['-1', '1.5', 'abc', '7d'])('%j は不正な値としてエラー', (value) => {
     expect(() => getReportEditLimitDays({ REPORT_EDIT_LIMIT_DAYS: value })).toThrow(
-      'REPORT_EDIT_LIMIT_DAYS',
+      `REPORT_EDIT_LIMIT_DAYS は 0 以上の整数で指定してください（現在の値: "${value}"）`,
     )
   })
 })

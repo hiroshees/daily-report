@@ -60,7 +60,7 @@ const noContent = (description: string) => ({ 204: { description } })
 const errorResponses = {
   400: '入力値が不正（VALIDATION_ERROR）',
   401: '認証が必要（AUTH_UNAUTHORIZED / AUTH_TOKEN_EXPIRED）',
-  403: '権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED）',
+  403: '権限がない（FORBIDDEN）',
   404: 'リソースが存在しない（NOT_FOUND）',
   409: '競合（DUPLICATE_REPORT / DUPLICATE_EMAIL / RESOURCE_IN_USE）',
 } as const
@@ -171,7 +171,15 @@ export function createRegistry(): OpenAPIRegistry {
       params: IdParamSchema,
       body: { required: true, ...jsonBody(ReportUpdateRequestSchema) },
     },
-    responses: { ...ok('更新した日報', ReportUpdateResponseSchema), ...errors(400, 401, 403, 404) },
+    responses: {
+      ...ok('更新した日報', ReportUpdateResponseSchema),
+      ...errors(400, 401, 403, 404),
+      // 共通の 403 説明を、編集期限超過を含む説明で上書きする
+      403: {
+        description: '権限がない・編集期限超過（FORBIDDEN / EDIT_PERIOD_EXPIRED）',
+        ...jsonBody(ErrorResponseSchema),
+      },
+    },
   })
   registry.registerPath({
     method: 'delete',
