@@ -55,3 +55,12 @@ export async function listReports(query: ReportListQuery, user: Pick<SessionUser
 
   return paginatedResult(data, total, query)
 }
+
+/** 指定した担当者・日付の日報 ID（なければ null）。一覧画面で「本日分は作成済みか」を判定するのに使う */
+export async function findReportIdByDate(salesPersonId: number, date: string) {
+  const report = await prisma.dailyReport.findFirst({
+    where: { salesPersonId, reportDate: toDate(date) },
+    select: { id: true },
+  })
+  return report?.id ?? null
+}
