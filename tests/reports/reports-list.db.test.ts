@@ -3,6 +3,7 @@ import { GET as listReportsRoute } from '@/app/api/v1/reports/route'
 import { prisma } from '@/lib/prisma'
 import { ReportListItemSchema } from '@/schemas/report'
 import { signSessionToken } from '@/server/jwt'
+import { findReportIdByDate } from '@/server/services/report-list'
 import { createCustomer, createSalesPerson, resetDatabase } from '../db/helpers'
 
 // 実行された SQL を記録する PrismaClient に差し替える（N+1 になっていないことを確認するため）。
@@ -420,5 +421,17 @@ describe('ページネーション', () => {
     const expected = await prisma.dailyReport.count({ where: { salesPersonId: yamada.id } })
     expect(body.pagination.total).toBe(expected)
     expect(body.pagination.total_pages).toBe(Math.ceil(expected / 5))
+  })
+})
+
+describe('findReportIdByDate', () => {
+  it('指定した担当者・日付の日報 ID を返す。なければ null', async () => {
+    const mine = await report(yamada.id, '2025-07-27')
+    await report(suzuki.id, '2025-07-28')
+
+    expect(await findReportIdByDate(yamada.id, '2025-07-27')).toBe(mine.id)
+    // 他人の日報や、別の日付は対象にしない
+    expect(await findReportIdByDate(yamada.id, '2025-07-28')).toBeNull()
+    expect(await findReportIdByDate(suzuki.id, '2025-07-27')).toBeNull()
   })
 })
