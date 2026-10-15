@@ -49,3 +49,4 @@ export const CustomerUpdateResponseSchema = CustomerSchema.omit({ created_at: tr
 
 export type CustomerCreateRequest = z.infer<typeof CustomerCreateRequestSchema>
 export type CustomerUpdateRequest = z.infer<typeof CustomerUpdateRequestSchema>
+export type CustomerListQuery = z.infer<typeof CustomerListQuerySchema>
