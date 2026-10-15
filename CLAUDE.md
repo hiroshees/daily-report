@@ -37,7 +37,7 @@
 
 ### 3.1 ER図
 
-@doc/ER_DIAGRAM.md
+詳細は `doc/ER_DIAGRAM.md` を参照（関連作業の際に読むこと）
 
 ## 4. テーブル定義詳細
 
@@ -134,12 +134,12 @@
 
 ## 8. 画面設計
 
-@doc/SCREEN_DESIGN.md
+詳細は `doc/SCREEN_DESIGN.md` を参照（関連作業の際に読むこと）
 
 ## 9. API仕様書
 
-@doc/API_SCHEME.md
+詳細は `doc/API_SCHEME.md` を参照（関連作業の際に読むこと）
 
 ## 10. テスト仕様書
 
-@doc/TEST_DEFINITION.md
+詳細は `doc/TEST_DEFINITION.md` を参照（関連作業の際に読むこと）
