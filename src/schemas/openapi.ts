@@ -165,13 +165,21 @@ export function createRegistry(): OpenAPIRegistry {
     tags: ['日報'],
     summary: '日報更新',
     description:
-      '作成者本人のみ。訪問記録は差分更新（id あり=更新、id なし=新規、送られなかった既存分=削除）',
+      '作成者本人のみ（管理者も他人の日報は不可）。訪問記録は差分更新（id あり=更新、id なし=新規、送られなかった既存分=削除。他日報の id は 400）。作成から一定期間（環境変数 REPORT_EDIT_LIMIT_DAYS、既定 7 日）を過ぎると 403 EDIT_PERIOD_EXPIRED',
     ...secured,
     request: {
       params: IdParamSchema,
       body: { required: true, ...jsonBody(ReportUpdateRequestSchema) },
     },
-    responses: { ...ok('更新した日報', ReportUpdateResponseSchema), ...errors(400, 401, 403, 404) },
+    responses: {
+      ...ok('更新した日報', ReportUpdateResponseSchema),
+      ...errors(400, 401, 403, 404),
+      // 共通の 403 説明を、編集期限超過を含む説明で上書きする
+      403: {
+        description: '権限がない・編集期限超過（FORBIDDEN / EDIT_PERIOD_EXPIRED）',
+        ...jsonBody(ErrorResponseSchema),
+      },
+    },
   })
   registry.registerPath({
     method: 'delete',

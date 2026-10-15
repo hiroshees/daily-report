@@ -53,3 +53,20 @@ export function getAuthEnv(env: Record<string, string | undefined> = process.env
   cached = { key: cacheKey, value }
   return value
 }
+
+/** 日報の編集可能日数の既定値。TODO(#27): 期間は未確定のため暫定値 */
+export const DEFAULT_REPORT_EDIT_LIMIT_DAYS = 7
+
+/** `REPORT_EDIT_LIMIT_DAYS`（作成から何日まで編集可能か）。未設定なら既定値、不正（0 以上の整数以外）ならエラー */
+export function getReportEditLimitDays(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  const raw = env.REPORT_EDIT_LIMIT_DAYS
+  if (!raw) return DEFAULT_REPORT_EDIT_LIMIT_DAYS
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(
+      `環境変数が正しくありません:\n- REPORT_EDIT_LIMIT_DAYS は 0 以上の整数で指定してください（現在の値: "${raw}"）`,
+    )
+  }
+  return Number(raw)
+}
