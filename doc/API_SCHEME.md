@@ -278,7 +278,11 @@ X-Request-Id: {request-id}
 
 #### PUT /reports/{id}
 
-日報を更新
+日報を更新（作成者本人のみ。管理者も他人の日報は更新不可）
+
+- `report_date` / `sales_person_id` は変更不可（リクエストに含めても無視される）
+- `visits` は差分更新：`id` あり=更新（その日報の訪問記録のみ。他日報の `id` は 400）、`id` なし=新規、送られなかった既存分=削除
+- 作成から一定期間（環境変数 `REPORT_EDIT_LIMIT_DAYS`、既定 7 日。暫定・#27）を過ぎると 403 `EDIT_PERIOD_EXPIRED`
 
 **リクエスト**
 
@@ -317,7 +321,7 @@ X-Request-Id: {request-id}
 
 #### DELETE /reports/{id}
 
-日報を削除
+日報を削除（作成者本人のみ。管理者も他人の日報は削除不可）。訪問記録・コメントも削除される
 
 **レスポンス**
 

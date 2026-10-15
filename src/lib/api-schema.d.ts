@@ -328,7 +328,7 @@ export interface paths {
         };
         /**
          * 日報更新
-         * @description 作成者本人のみ。訪問記録は差分更新（id あり=更新、id なし=新規、送られなかった既存分=削除）
+         * @description 作成者本人のみ（管理者も他人の日報は不可）。訪問記録は差分更新（id あり=更新、id なし=新規、送られなかった既存分=削除。他日報の id は 400）。作成から一定期間（環境変数 REPORT_EDIT_LIMIT_DAYS、既定 7 日）を過ぎると 403 EDIT_PERIOD_EXPIRED
          */
         put: {
             parameters: {
@@ -372,7 +372,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description 権限がない（FORBIDDEN） */
+                /** @description 権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED） */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -424,7 +424,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description 権限がない（FORBIDDEN） */
+                /** @description 権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED） */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -546,7 +546,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description 権限がない（FORBIDDEN） */
+                /** @description 権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED） */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -617,7 +617,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description 権限がない（FORBIDDEN） */
+                /** @description 権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED） */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -673,7 +673,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description 権限がない（FORBIDDEN） */
+                /** @description 権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED） */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -739,7 +739,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description 権限がない（FORBIDDEN） */
+                /** @description 権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED） */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -805,7 +805,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description 権限がない（FORBIDDEN） */
+                /** @description 権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED） */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -866,7 +866,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description 権限がない（FORBIDDEN） */
+                /** @description 権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED） */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -1001,7 +1001,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description 権限がない（FORBIDDEN） */
+                /** @description 権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED） */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -1112,7 +1112,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description 権限がない（FORBIDDEN） */
+                /** @description 権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED） */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -1164,7 +1164,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description 権限がない（FORBIDDEN） */
+                /** @description 権限がない（FORBIDDEN / EDIT_PERIOD_EXPIRED） */
                 403: {
                     headers: {
                         [name: string]: unknown;
