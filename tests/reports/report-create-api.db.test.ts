@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { POST } from '@/app/api/v1/reports/route'
 import { prisma } from '@/lib/prisma'
+import { createReport as createReportService } from '@/server/services/report'
 import { signSessionToken } from '@/server/jwt'
 import { createCustomer, createReport, createSalesPerson, resetDatabase } from '../db/helpers'
 
@@ -159,6 +160,30 @@ describe('POST /reports', () => {
     ])
     expect(await prisma.dailyReport.count()).toBe(0)
     expect(await prisma.visitRecord.count()).toBe(0)
+  })
+
+  it('顧客の存在確認後に顧客が削除された場合（P2003）は 400 で、日報もロールバックされる', async () => {
+    // 存在確認をすり抜けた状態を再現する（確認では存在すると返し、実際の挿入では FK 違反にする）
+    const original = prisma.customer.findMany.bind(prisma.customer)
+    const spy = vi
+      .spyOn(prisma.customer, 'findMany')
+      .mockResolvedValueOnce([{ id: 99999 }] as never)
+      .mockImplementation(original as never)
+    const { status, body } = await post(payload({ visits: [visit({ customer_id: 99999 })] }), user)
+    // 後続のテストに影響しないよう、元の実装に委譲させたままにする
+    spy.mockImplementation(original as never)
+
+    expect(status).toBe(400)
+    expect(body.error.code).toBe('VALIDATION_ERROR')
+    expect(body.error.details).toEqual([
+      { field: 'visits', message: '指定された顧客が存在しません' },
+    ])
+    expect(await prisma.dailyReport.count()).toBe(0)
+  })
+
+  it('担当者側の外部キー違反は顧客エラーにせず再 throw される', async () => {
+    await expect(createReportService(99999, payload())).rejects.toMatchObject({ code: 'P2003' })
+    expect(await prisma.dailyReport.count()).toBe(0)
   })
 
   it('未認証は 401', async () => {

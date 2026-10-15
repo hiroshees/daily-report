@@ -56,10 +56,20 @@ const isPrismaError = (error: unknown, code: string) =>
 /** `HH:mm` を DB の time 型用の Date にする（日付部分は無視される） */
 const toTimeDate = (time: string) => new Date(`1970-01-01T${time}:00Z`)
 
-const customerNotFound = (index: number) =>
+// index が不明な場合（DB エラー経由）は visits 全体を指す
+const customerNotFound = (index?: number) =>
   new ApiError('VALIDATION_ERROR', undefined, [
-    { field: `visits.${index}.customer_id`, message: '指定された顧客が存在しません' },
+    {
+      field: index === undefined ? 'visits' : `visits.${index}.customer_id`,
+      message: '指定された顧客が存在しません',
+    },
   ])
+
+/** 訪問記録の顧客への外部キー違反か（日報の担当者など別の外部キー違反と区別する） */
+const isCustomerForeignKeyError = (error: unknown) =>
+  isPrismaError(error, 'P2003') &&
+  (error as Prisma.PrismaClientKnownRequestError).meta?.constraint ===
+    'visit_record_customer_id_fkey'
 
 /**
  * 日報と訪問記録を 1 トランザクションで作成する。
@@ -103,10 +113,10 @@ export async function createReport(salesPersonId: number, input: ReportCreateReq
       created_at: toIso(report.createdAt),
     }
   } catch (error) {
-    // 事前チェックをすり抜けた同時リクエストも DB のユニーク制約で 409 にする
+    // 同一担当者・同一日付の重複は DB のユニーク制約で検出して 409 にする（同時リクエストもここで防ぐ）
     if (isPrismaError(error, 'P2002')) throw new ApiError('DUPLICATE_REPORT')
-    // 事前チェック後に顧客が削除された場合
-    if (isPrismaError(error, 'P2003')) throw customerNotFound(0)
+    // 顧客の存在確認後に削除された場合のみ 400。それ以外の外部キー違反は握りつぶさず再 throw する
+    if (isCustomerForeignKeyError(error)) throw customerNotFound()
     throw error
   }
 }
