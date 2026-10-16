@@ -29,9 +29,13 @@ type SalesPersonFilterProps = {
 export function SalesPersonFilter({ current, departments }: SalesPersonFilterProps) {
   const router = useRouter()
   const id = useId()
-  // 一覧にない部署（URL の手入力など）は「すべて」として扱う
-  const department =
-    current.department && departments.includes(current.department) ? current.department : ALL
+  // 一覧にない部署（URL の手入力など）で絞り込み中は、その値を選択肢に加えて表示する
+  // （「すべて」と表示したまま 0 件になる食い違いを防ぐ）
+  const department = current.department ?? ALL
+  const options =
+    current.department && !departments.includes(current.department)
+      ? [...departments, current.department]
+      : departments
 
   function change(next: SalesPersonListParams) {
     router.push(buildSalesPersonListHref({ ...current, ...next }))
@@ -50,7 +54,7 @@ export function SalesPersonFilter({ current, departments }: SalesPersonFilterPro
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>すべて</SelectItem>
-            {departments.map((name) => (
+            {options.map((name) => (
               <SelectItem key={name} value={name}>
                 {name}
               </SelectItem>

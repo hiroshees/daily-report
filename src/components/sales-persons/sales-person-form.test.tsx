@@ -139,6 +139,39 @@ describe('SalesPersonForm（登録）', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('想定外のエラー')
   })
 
+  it('編集では password の 400 エラーを、表示先のある（フォーム全体の）エラーにする', async () => {
+    put.mockResolvedValue(
+      failure(400, {
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: '入力値が不正です',
+          details: [{ field: 'password', message: 'パスワードは8文字以上で入力してください' }],
+        },
+      }),
+    )
+    const { user } = setup({ person })
+    await user.type(screen.getByLabelText('氏名'), 'A')
+    await waitFor(() => expect(save()).toBeEnabled())
+    await user.click(save())
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'パスワードは8文字以上で入力してください',
+    )
+  })
+
+  it('保存の通信中かどうかを通知する', async () => {
+    let resolve!: (value: unknown) => void
+    post.mockReturnValue(new Promise((r) => (resolve = r)))
+    const onSubmittingChange = vi.fn()
+    const { user } = setup({ onSubmittingChange })
+    await fillCreate(user)
+    await user.click(save())
+
+    await waitFor(() => expect(onSubmittingChange).toHaveBeenLastCalledWith(true))
+    resolve(ok())
+    await waitFor(() => expect(onSubmittingChange).toHaveBeenLastCalledWith(false))
+  })
+
   it('通信エラー時は汎用メッセージを表示し、再度保存できる', async () => {
     post.mockRejectedValue(new Error('network'))
     const { user } = setup()

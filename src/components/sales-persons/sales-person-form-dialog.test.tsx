@@ -100,4 +100,31 @@ describe('SalesPersonFormDialog', () => {
     )
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
+
+  it('保存の通信中は Escape で閉じられず、失敗したらエラーを表示する', async () => {
+    let resolve!: (value: unknown) => void
+    put.mockReturnValue(new Promise((r) => (resolve = r)))
+    const user = userEvent.setup()
+    render(<SalesPersonFormDialog person={person} trigger={<Button>編集</Button>} />)
+
+    await user.click(screen.getByRole('button', { name: '編集' }))
+    await user.type(screen.getByLabelText('氏名'), 'A')
+    await waitFor(() => expect(save()).toBeEnabled())
+    await user.click(save())
+    await screen.findByRole('button', { name: '保存中…' })
+
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog', { name: '営業担当者の編集' })).toBeInTheDocument()
+
+    resolve({
+      response: new Response(null, { status: 500 }),
+      data: undefined,
+      error: { error: { code: 'INTERNAL', message: '保存できません' } },
+    })
+    expect(await screen.findByText('保存できません')).toBeInTheDocument()
+
+    // 通信が終われば閉じられる
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 })

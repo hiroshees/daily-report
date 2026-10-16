@@ -25,7 +25,7 @@ describe('SalesPersonFilter', () => {
     expect(screen.getByRole('combobox', { name: '権限' })).toHaveTextContent('すべて')
   })
 
-  it('現在の条件を初期表示する。一覧にない部署は「すべて」として扱う', () => {
+  it('現在の条件を初期表示する。一覧にない部署は、その値を選択肢に加えて表示する', () => {
     const { rerender } = render(
       <SalesPersonFilter
         current={{ department: '営業2課', is_manager: 'true' }}
@@ -38,7 +38,7 @@ describe('SalesPersonFilter', () => {
     rerender(
       <SalesPersonFilter current={{ department: '存在しない課' }} departments={departments} />,
     )
-    expect(screen.getByRole('combobox', { name: '部署' })).toHaveTextContent('すべて')
+    expect(screen.getByRole('combobox', { name: '部署' })).toHaveTextContent('存在しない課')
   })
 
   it('部署を選ぶと、他の条件を保ったまま絞り込む', async () => {

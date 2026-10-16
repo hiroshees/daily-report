@@ -3,14 +3,13 @@ import { Suspense } from 'react'
 import { ForbiddenView } from '@/components/common/error-view'
 import { FormError } from '@/components/common/form-error'
 import { ReportListSkeleton } from '@/components/reports/report-list-skeleton'
-import { SalesPersonFilter } from '@/components/sales-persons/sales-person-filter'
+import { SalesPersonFilterSection } from '@/components/sales-persons/sales-person-filter-section'
 import { SalesPersonFormDialog } from '@/components/sales-persons/sales-person-form-dialog'
 import { SalesPersonResults } from '@/components/sales-persons/sales-person-results'
 import { Button } from '@/components/ui/button'
 import { buildSalesPersonListHref } from '@/lib/sales-person-list-params'
 import { SalesPersonListQuerySchema } from '@/schemas/sales-person'
 import { requireManagerPage } from '@/server/page-auth'
-import { listSalesPersons } from '@/server/services/sales-person'
 
 type SearchParams = Record<string, string | string[] | undefined>
 
@@ -31,17 +30,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
   const parsed = SalesPersonListQuerySchema.safeParse(params)
   const href = buildSalesPersonListHref(parsed.success ? parsed.data : {})
 
-  // 部署の選択肢は、絞り込み前の全担当者から作る。取得に失敗しても一覧は使えるよう、空にして続ける
-  let departments: string[] = []
-  try {
-    const all = (await listSalesPersons({})).data
-    departments = [...new Set(all.map((person) => person.department))].sort((a, b) =>
-      a.localeCompare(b, 'ja'),
-    )
-  } catch (error) {
-    console.error('部署の一覧の取得に失敗しました', error)
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -51,7 +39,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
 
       {parsed.success ? (
         <>
-          <SalesPersonFilter current={parsed.data} departments={departments} />
+          {/* 部署の選択肢の取得を待たずに、先に絞り込み（選択肢なし）と一覧のスケルトンを表示する */}
+          <Suspense fallback={<SalesPersonFilterSection current={parsed.data} departments={[]} />}>
+            <SalesPersonFilterSection current={parsed.data} />
+          </Suspense>
           {/* 絞り込み条件ごとに fallback（スケルトン）を出し直す */}
           <Suspense key={href} fallback={<ReportListSkeleton />}>
             <SalesPersonResults query={parsed.data} currentUserId={user.id} href={href} />

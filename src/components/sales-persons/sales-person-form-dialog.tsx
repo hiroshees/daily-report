@@ -25,6 +25,7 @@ type SalesPersonFormDialogProps = {
 export function SalesPersonFormDialog({ person, isSelf, trigger }: SalesPersonFormDialogProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
   const isEdit = person !== undefined
 
   function saved() {
@@ -41,7 +42,14 @@ export function SalesPersonFormDialog({ person, isSelf, trigger }: SalesPersonFo
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      // 保存の通信中に閉じると、失敗してもエラーが見えなくなるため、閉じる操作を無視する
+      onOpenChange={(next) => {
+        if (!next && saving) return
+        setOpen(next)
+      }}
+    >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -56,6 +64,7 @@ export function SalesPersonFormDialog({ person, isSelf, trigger }: SalesPersonFo
           isSelf={isSelf}
           onSaved={saved}
           onCancel={() => setOpen(false)}
+          onSubmittingChange={setSaving}
           onNotFound={notFound}
         />
       </DialogContent>

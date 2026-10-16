@@ -1,7 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
 import { FormError } from '@/components/common/form-error'
 import { Button } from '@/components/ui/button'
@@ -46,6 +46,8 @@ type SalesPersonFormProps = {
   isSelf?: boolean
   onSaved: () => void
   onCancel: () => void
+  /** 保存の通信中かどうかの通知。ダイアログが、通信中に閉じられないようにするために使う */
+  onSubmittingChange?: (submitting: boolean) => void
   /** 編集中に、対象が別の管理者に削除されていた場合 */
   onNotFound: () => void
 }
@@ -56,6 +58,7 @@ export function SalesPersonForm({
   isSelf,
   onSaved,
   onCancel,
+  onSubmittingChange,
   onNotFound,
 }: SalesPersonFormProps) {
   const isEdit = person !== undefined
@@ -79,6 +82,10 @@ export function SalesPersonForm({
       : EMPTY_SALES_PERSON,
   })
   const { isSubmitting, isValid } = form.formState
+
+  useEffect(() => {
+    onSubmittingChange?.(isSubmitting)
+  }, [isSubmitting, onSubmittingChange])
 
   async function onSubmit(values: SalesPersonFormValues) {
     // 二重送信の防止（state は再描画まで反映されないため ref で判定する）
@@ -113,7 +120,8 @@ export function SalesPersonForm({
         // 項目に対応するエラーは入力欄に、対応できないものはフォーム全体に表示する
         const unmatched: string[] = []
         for (const { field, message } of error.error.details) {
-          if (isField(field)) form.setError(field, { message })
+          // 編集ではパスワード欄がなく、表示先がないため、フォーム全体に表示する
+          if (isField(field) && !(isEdit && field === 'password')) form.setError(field, { message })
           else unmatched.push(message)
         }
         if (unmatched.length) setFormError(unmatched.join(' / '))
