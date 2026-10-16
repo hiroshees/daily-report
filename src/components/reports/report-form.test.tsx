@@ -113,7 +113,7 @@ describe('ReportForm（SC003）', () => {
   })
 
   it('TC-REPORT-004: 課題・計画 1001 文字でエラーを表示し、保存できない', async () => {
-    const user = renderForm()
+    renderForm()
     setText(problem(), 'あ'.repeat(1001))
     setText(plan(), 'い'.repeat(1001))
 
@@ -127,7 +127,6 @@ describe('ReportForm（SC003）', () => {
     setText(problem(), 'あ'.repeat(1000))
     setText(plan(), 'い'.repeat(1000))
     await waitFor(() => expect(saveButton()).toBeEnabled())
-    await user.tab()
   })
 
   it('空白のみの入力は必須エラーにする', async () => {
