@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-html-link-for-pages -- 離脱確認フックの検証のため、Next.js の Link ではなく素の <a> を使う */
 import { render, screen } from '@testing-library/react'
 import { useUnsavedChangesGuard } from '@/lib/use-unsaved-changes-guard'
 

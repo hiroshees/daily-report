@@ -52,6 +52,8 @@ type ReportFormProps = {
   | {
       mode: 'edit'
       reportId: number
+      /** 保存後・キャンセル後に戻る日報詳細の URL（一覧の検索条件を引き継ぐ） */
+      detailHref: string
       /** 既存の日報の内容（訪問記録は visit_id を保持し、差分更新に使う） */
       initialValues: ReportFormValues
       /** 既存の訪問記録の顧客名（顧客 ID → 会社名） */
@@ -81,7 +83,7 @@ export function ReportForm(props: ReportFormProps) {
   const [createDate, setCreateDate] = useState(props.reportDate)
   const reportDate = props.mode === 'edit' ? props.reportDate : createDate
   // 保存後・キャンセル後の戻り先（作成は一覧、編集は日報詳細）
-  const backHref = props.mode === 'edit' ? `/reports/${props.reportId}` : '/reports'
+  const backHref = props.mode === 'edit' ? props.detailHref : '/reports'
   const backLabel = props.mode === 'edit' ? '日報詳細' : '一覧'
   const [formError, setFormError] = useState<string | null>(null)
   // 保存成功後は、画面遷移が終わるまで離脱確認とボタン操作を止める

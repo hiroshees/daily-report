@@ -26,6 +26,8 @@ vi.mock('@/components/reports/customer-combobox', () => ({
 const put = vi.mocked(apiClient.PUT) as unknown as ReturnType<typeof vi.fn>
 const post = vi.mocked(apiClient.POST) as unknown as ReturnType<typeof vi.fn>
 
+const DETAIL_HREF = '/reports/42?back=%2Freports%3Fpage%3D2'
+
 const initialValues = {
   problem: '既存の課題',
   plan: '既存の計画',
@@ -41,6 +43,7 @@ function renderForm() {
     <ReportForm
       mode="edit"
       reportId={42}
+      detailHref={DETAIL_HREF}
       reportDate="2025-07-20"
       authorName="山田太郎"
       initialValues={initialValues}
@@ -85,7 +88,7 @@ describe('ReportForm（編集 / SC004）', () => {
     await user.click(screen.getByRole('button', { name: 'キャンセル' }))
 
     expect(confirm).not.toHaveBeenCalled()
-    expect(router.push).toHaveBeenCalledWith('/reports/42')
+    expect(router.push).toHaveBeenCalledWith(DETAIL_HREF)
   })
 
   it('追加・更新・削除した訪問記録を、id 付きの差分で PUT する', async () => {
@@ -129,10 +132,10 @@ describe('ReportForm（編集 / SC004）', () => {
     await waitFor(() => expect(saveButton()).toBeEnabled())
     await user.click(saveButton())
 
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/reports/42'))
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith(DETAIL_HREF))
     expect(await screen.findByRole('link', { name: '移動しない場合はこちら' })).toHaveAttribute(
       'href',
-      '/reports/42',
+      DETAIL_HREF,
     )
   })
 
@@ -144,7 +147,7 @@ describe('ReportForm（編集 / SC004）', () => {
     await user.click(screen.getByRole('button', { name: 'キャンセル' }))
 
     expect(confirm).toHaveBeenCalled()
-    expect(router.push).toHaveBeenCalledWith('/reports/42')
+    expect(router.push).toHaveBeenCalledWith(DETAIL_HREF)
   })
 
   it('編集期限切れ(403)のメッセージを表示し、遷移しない', async () => {
@@ -205,7 +208,7 @@ describe('ReportForm（編集 / SC004）', () => {
 
     expect(saveButton()).toBeEnabled()
     await user.click(saveButton())
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/reports/42'))
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith(DETAIL_HREF))
   })
 
   it('空にした必須項目はエラーにして保存できない', async () => {

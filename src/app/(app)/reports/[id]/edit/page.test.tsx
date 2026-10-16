@@ -50,8 +50,8 @@ const report = {
   updated_at: new Date().toISOString(),
 }
 
-async function renderPage(id = '42') {
-  render(await Page({ params: Promise.resolve({ id }) }))
+async function renderPage(id = '42', search: Record<string, string> = {}) {
+  render(await Page({ params: Promise.resolve({ id }), searchParams: Promise.resolve(search) }))
 }
 const formProps = () => JSON.parse(screen.getByTestId('form').textContent ?? '{}')
 
@@ -72,6 +72,7 @@ describe('日報編集ページ', () => {
     expect(formProps()).toEqual({
       mode: 'edit',
       reportId: 42,
+      detailHref: '/reports/42',
       reportDate: '2025-07-20',
       authorName: '山田太郎',
       initialValues: {
@@ -84,6 +85,16 @@ describe('日報編集ページ', () => {
       },
       customerLabels: { 3: 'ABC商事', 4: 'XYZ工業' },
     })
+  })
+
+  it('一覧の検索条件（back）を、日報詳細への戻り先に引き継ぐ。不正な値は無視する', async () => {
+    await renderPage('42', { back: '/reports?page=2' })
+    expect(formProps().detailHref).toBe('/reports/42?back=%2Freports%3Fpage%3D2')
+  })
+
+  it('back に外部 URL が指定されても引き継がない', async () => {
+    await renderPage('42', { back: '//evil.example.com' })
+    expect(formProps().detailHref).toBe('/reports/42')
   })
 
   it('他人の日報は 403 画面を表示し、フォームを出さない', async () => {

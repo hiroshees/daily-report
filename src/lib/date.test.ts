@@ -1,4 +1,4 @@
-import { formatFullDate, formatReportDate, todayInJst } from '@/lib/date'
+import { formatFullDate, formatJstDateTime, formatReportDate, todayInJst } from '@/lib/date'
 
 describe('formatReportDate', () => {
   it('同じ年は M/d 形式', () => {
@@ -21,5 +21,20 @@ describe('todayInJst', () => {
 describe('formatFullDate', () => {
   it('yyyy/MM/dd 形式で返す', () => {
     expect(formatFullDate('2025-07-07')).toBe('2025/07/07')
+  })
+})
+
+describe('formatJstDateTime', () => {
+  it('日本時間の M/d HH:mm で返す', () => {
+    // UTC 09:00 は JST 18:00
+    expect(formatJstDateTime('2025-07-27T09:00:00Z')).toBe('7/27 18:00')
+  })
+
+  it('日付をまたぐ場合は日本時間の日付にする', () => {
+    expect(formatJstDateTime('2025-07-27T16:30:00Z')).toBe('7/28 01:30')
+  })
+
+  it('0 時台は 24 時表記にしない', () => {
+    expect(formatJstDateTime('2025-07-26T15:05:00Z')).toBe('7/27 00:05')
   })
 })
