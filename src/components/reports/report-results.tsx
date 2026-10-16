@@ -65,7 +65,7 @@ export async function ReportResults({ query, isManager, today, href }: ReportRes
 
   return (
     <div className="space-y-4">
-      <ReportTable reports={data} today={today} />
+      <ReportTable reports={data} today={today} listHref={href} />
       <ReportPagination pagination={pagination} params={conditions} />
     </div>
   )

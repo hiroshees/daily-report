@@ -17,3 +17,18 @@ export function formatReportDate(date: string, today: string = todayInJst()): st
 export function formatFullDate(date: string): string {
   return format(parseISO(date), 'yyyy/MM/dd')
 }
+
+/** 日時（ISO 8601）の表示。日本時間の `M/d HH:mm` 形式（コメント日時など） */
+export function formatJstDateTime(iso: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tokyo',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(iso))
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? ''
+  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+}

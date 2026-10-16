@@ -3,13 +3,22 @@ import { notFound } from 'next/navigation'
 import { ErrorView, ForbiddenView } from '@/components/common/error-view'
 import { ReportForm } from '@/components/reports/report-form'
 import { Button } from '@/components/ui/button'
+import { parseBackHref, withBack } from '@/lib/report-back'
 import { IdParamSchema } from '@/schemas/common'
 import { ApiError } from '@/server/errors'
 import { requirePageUser } from '@/server/page-auth'
 import { isReportEditExpired } from '@/server/report-edit-period'
 import { getReport } from '@/server/services/report'
 
-export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+type SearchParams = Record<string, string | string[] | undefined>
+
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<SearchParams>
+}) {
   // レイアウトの確認に頼らず、ページでも確認する
   const user = await requirePageUser()
 
@@ -24,6 +33,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     throw error
   }
 
+  // 詳細画面へ戻るとき、一覧の検索条件を引き継ぐ
+  const detailHref = withBack(`/reports/${report.id}`, parseBackHref((await searchParams).back))
+
   // 編集できるのは作成者本人のみ（管理者も他人の日報は不可）。URL 直打ちを防ぐため、サーバー側で必ず確認する
   if (report.sales_person.id !== user.id) return <ForbiddenView />
 
@@ -35,7 +47,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         message="編集可能な期間を過ぎています"
         action={
           <Button asChild>
-            <Link href={`/reports/${report.id}`}>日報詳細へ戻る</Link>
+            <Link href={detailHref}>日報詳細へ戻る</Link>
           </Button>
         }
       />
@@ -48,6 +60,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <ReportForm
         mode="edit"
         reportId={report.id}
+        detailHref={detailHref}
         reportDate={report.report_date}
         authorName={report.sales_person.name}
         initialValues={{

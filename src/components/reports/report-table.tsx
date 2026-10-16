@@ -10,6 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatReportDate } from '@/lib/date'
+import { withBack } from '@/lib/report-back'
 
 export type ReportListRow = {
   id: number
@@ -23,9 +24,11 @@ type ReportTableProps = {
   reports: ReportListRow[]
   /** 日付表示の基準日（YYYY-MM-DD）。年またぎ判定に使う */
   today: string
+  /** 詳細画面から「戻る」ときの一覧 URL（検索条件・ページを保持する） */
+  listHref?: string
 }
 
-export function ReportTable({ reports, today }: ReportTableProps) {
+export function ReportTable({ reports, today, listHref = '/reports' }: ReportTableProps) {
   return (
     <Table>
       <TableHeader>
@@ -58,7 +61,7 @@ export function ReportTable({ reports, today }: ReportTableProps) {
             <TableCell className="text-right">
               <Button asChild variant="outline" size="sm">
                 <Link
-                  href={`/reports/${report.id}`}
+                  href={withBack(`/reports/${report.id}`, listHref)}
                   aria-label={`${formatReportDate(report.report_date, today)} ${report.sales_person.name}の日報詳細`}
                 >
                   詳細
