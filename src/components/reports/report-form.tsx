@@ -29,21 +29,35 @@ import { countChars } from '@/schemas/fields'
 import { PLAN_MAX_LENGTH, PROBLEM_MAX_LENGTH, VISIT_CONTENT_MAX_LENGTH } from '@/schemas/report'
 import {
   EMPTY_VISIT,
+  EditReportFormSchema,
   ReportFormSchema,
   toCreateRequest,
+  toUpdateRequest,
   type ReportFormSchemaOutput,
   type ReportFormValues,
 } from '@/schemas/report-form'
 
 const GENERIC_ERROR = '日報の保存に失敗しました。時間をおいてもう一度お試しください。'
+/** 再送信しても成功しない API エラー */
+const UNRECOVERABLE_CODES: readonly string[] = ['EDIT_PERIOD_EXPIRED', 'FORBIDDEN', 'NOT_FOUND']
 const LEAVE_CONFIRM = '入力中の内容は保存されていません。破棄して移動しますか？'
 
 type ReportFormProps = {
-  /** 日報の日付（YYYY-MM-DD）。本日固定で、変更できない */
+  /** 日報の日付（YYYY-MM-DD）。作成では本日固定、編集では既存の日付。どちらも変更できない */
   reportDate: string
   /** 作成者（ログインユーザー）の氏名 */
   authorName: string
-}
+} & (
+  | { mode: 'create' }
+  | {
+      mode: 'edit'
+      reportId: number
+      /** 既存の日報の内容（訪問記録は visit_id を保持し、差分更新に使う） */
+      initialValues: ReportFormValues
+      /** 既存の訪問記録の顧客名（顧客 ID → 会社名） */
+      customerLabels: Record<number, string>
+    }
+)
 
 /** 文字数カウンタ（現在/上限）。上限を超えたら赤字にする */
 function CharCounter({ value, max }: { value: string; max: number }) {
@@ -58,26 +72,33 @@ function CharCounter({ value, max }: { value: string; max: number }) {
   )
 }
 
-/** 日報作成フォーム（SC003）。訪問記録は動的に追加・削除できる */
-export function ReportForm({ reportDate: initialDate, authorName }: ReportFormProps) {
+/** 日報フォーム。作成（SC003）と編集（SC004）で共通。訪問記録は動的に追加・削除できる */
+export function ReportForm(props: ReportFormProps) {
+  const { authorName } = props
   const router = useRouter()
-  // 日付をまたいで開きっぱなしにした場合は、送信時に最新の「本日」へ更新する
-  const [reportDate, setReportDate] = useState(initialDate)
+  // 作成のみ：日付をまたいで開きっぱなしにした場合に、送信時に最新の「本日」へ更新する。
+  // 編集の日付は既存のまま変わらない
+  const [createDate, setCreateDate] = useState(props.reportDate)
+  const reportDate = props.mode === 'edit' ? props.reportDate : createDate
+  // 保存後・キャンセル後の戻り先（作成は一覧、編集は日報詳細）
+  const backHref = props.mode === 'edit' ? `/reports/${props.reportId}` : '/reports'
+  const backLabel = props.mode === 'edit' ? '日報詳細' : '一覧'
   const [formError, setFormError] = useState<string | null>(null)
   // 保存成功後は、画面遷移が終わるまで離脱確認とボタン操作を止める
   const [saved, setSaved] = useState(false)
+  // 編集期限切れなど、再送信しても保存できない状態
+  const [locked, setLocked] = useState(false)
   const submittingRef = useRef(false)
 
   const form = useForm<ReportFormValues, unknown, ReportFormSchemaOutput>({
-    // 入力途中は顧客が未選択（undefined）になりうるため、入力型を ReportFormValues に広げる
-    resolver: zodResolver(ReportFormSchema) as Resolver<
-      ReportFormValues,
-      unknown,
-      ReportFormSchemaOutput
-    >,
+    // 入力途中は顧客が未選択（null）になりうるため、入力型を ReportFormValues に広げる
+    resolver: zodResolver(
+      props.mode === 'edit' ? EditReportFormSchema : ReportFormSchema,
+    ) as Resolver<ReportFormValues, unknown, ReportFormSchemaOutput>,
     // 入力のたびに検証し、不正な間は保存ボタンを押せないようにする（TC-REPORT-004）
     mode: 'onChange',
-    defaultValues: { visits: [], problem: '', plan: '' },
+    defaultValues:
+      props.mode === 'edit' ? props.initialValues : { visits: [], problem: '', plan: '' },
   })
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'visits' })
   const { isSubmitting, isValid, isDirty } = form.formState
@@ -86,6 +107,23 @@ export function ReportForm({ reportDate: initialDate, authorName }: ReportFormPr
   // 未保存のまま離脱する場合は確認する（保存成功後は遷移を妨げない）
   useUnsavedChangesGuard(isDirty && !saved, LEAVE_CONFIRM)
 
+  function updateReport(reportId: number, values: ReportFormSchemaOutput) {
+    return apiClient.PUT('/reports/{id}', {
+      params: { path: { id: reportId } },
+      body: toUpdateRequest(values),
+    })
+  }
+
+  function createReport(values: ReportFormSchemaOutput) {
+    // 画面を開いたまま日付が変わった場合は、本日付の日報として保存する（画面の日付も更新する）
+    const today = todayInJst()
+    if (today !== createDate) {
+      setCreateDate(today)
+      toast.info(`日付が変わったため、${formatFullDate(today)} の日報として保存します`)
+    }
+    return apiClient.POST('/reports', { body: toCreateRequest(values, today) })
+  }
+
   async function onSubmit(values: ReportFormSchemaOutput) {
     // 二重送信の防止。state は再描画まで反映されないため、同期的に更新できる ref で判定する。
     // 失敗時は解除して再送信できるようにし、成功時は遷移が終わるまで立てたままにする
@@ -93,24 +131,25 @@ export function ReportForm({ reportDate: initialDate, authorName }: ReportFormPr
     submittingRef.current = true
     setFormError(null)
 
-    // 画面を開いたまま日付が変わった場合は、本日付の日報として保存する（画面の日付も更新する）
-    const today = todayInJst()
-    if (today !== reportDate) {
-      setReportDate(today)
-      toast.info(`日付が変わったため、${formatFullDate(today)} の日報として保存します`)
-    }
-
     try {
-      const { response, error } = await apiClient.POST('/reports', {
-        body: toCreateRequest(values, today),
-      })
+      const { response, error } =
+        props.mode === 'edit'
+          ? await updateReport(props.reportId, values)
+          : await createReport(values)
 
       if (response.ok) {
         setSaved(true)
         toast.success('日報を保存しました')
-        // 遷移に失敗しても操作不能にならないよう、下の「一覧へ移動」リンクを案内する
-        router.push('/reports')
+        // 遷移に失敗しても操作不能にならないよう、下の移動リンクを案内する
+        router.push(backHref)
         router.refresh()
+        return
+      }
+
+      // 再送信しても成功しないエラー（期限切れ・権限なし・削除済み）は、保存できないようにする
+      if (error && UNRECOVERABLE_CODES.includes(error.error.code)) {
+        setLocked(true)
+        setFormError(error.error.message)
         return
       }
       submittingRef.current = false
@@ -140,7 +179,7 @@ export function ReportForm({ reportDate: initialDate, authorName }: ReportFormPr
 
   function cancel() {
     if (isDirty && !saved && !window.confirm(LEAVE_CONFIRM)) return
-    router.push('/reports')
+    router.push(backHref)
   }
 
   const busy = isSubmitting || saved
@@ -204,7 +243,12 @@ export function ReportForm({ reportDate: initialDate, authorName }: ReportFormPr
                         <FormLabel>顧客名</FormLabel>
                         <FormControl>
                           <CustomerCombobox
-                            value={customerField.value}
+                            value={customerField.value ?? undefined}
+                            selectedLabel={
+                              props.mode === 'edit' && customerField.value !== null
+                                ? props.customerLabels[customerField.value]
+                                : undefined
+                            }
                             onChange={(customerId) => {
                               customerField.onChange(customerId)
                               customerField.onBlur()
@@ -312,8 +356,8 @@ export function ReportForm({ reportDate: initialDate, authorName }: ReportFormPr
 
         {saved && (
           <p role="status" className="text-muted-foreground text-right text-sm">
-            保存しました。一覧へ移動しています…{' '}
-            <Link href="/reports" className="text-foreground underline">
+            保存しました。{backLabel}へ移動しています…{' '}
+            <Link href={backHref} className="text-foreground underline">
               移動しない場合はこちら
             </Link>
           </p>
@@ -323,7 +367,7 @@ export function ReportForm({ reportDate: initialDate, authorName }: ReportFormPr
           <Button type="button" variant="outline" onClick={cancel} disabled={busy}>
             キャンセル
           </Button>
-          <Button type="submit" disabled={!isValid || busy}>
+          <Button type="submit" disabled={!isValid || busy || locked}>
             {busy ? '保存中…' : '保存'}
           </Button>
         </div>

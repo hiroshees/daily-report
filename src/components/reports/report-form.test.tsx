@@ -38,7 +38,7 @@ const saveButton = () => screen.getByRole('button', { name: /^保存/ })
 
 function renderForm() {
   const user = userEvent.setup()
-  render(<ReportForm reportDate="2025-07-27" authorName="山田太郎" />)
+  render(<ReportForm mode="create" reportDate="2025-07-27" authorName="山田太郎" />)
   return user
 }
 
