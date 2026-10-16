@@ -12,11 +12,16 @@ import { issueSession, toCurrentUser, verifyCredentials } from '@/server/service
 export const POST = defineRoute({
   auth: 'none',
   body: LoginRequestSchema,
-  handler: async ({ body }) => {
+  handler: async ({ body, audit }) => {
     const user = await verifyCredentials(body.email, body.password)
-    if (!user) throw new ApiError('AUTH_INVALID_CREDENTIALS')
+    if (!user) {
+      // 失敗は理由を区別せず記録する（メールアドレス・パスワードはログに残さない）
+      audit('auth.login.failure')
+      throw new ApiError('AUTH_INVALID_CREDENTIALS')
+    }
 
     const { token, expiresAt } = await issueSession(user.id)
+    audit('auth.login.success', { userId: user.id })
     const maxAge = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000))
     const response: LoginResponse = {
       token,

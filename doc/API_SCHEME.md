@@ -643,3 +643,12 @@ X-Request-Id: {request-id}
 - レスポンスタイムアウト：30秒
 - 同時接続数：100接続/ユーザー
 
+
+## 6. アクセスログ
+
+全 API リクエストを、1 行の JSON として stdout / stderr に出力する（Vercel Logs が自動収集）。実装は `src/server/logger.ts` と `defineRoute`。
+
+- アクセスログ（`message: "access"`）：`time` / `level` / `requestId`（`X-Request-Id`）/ `method` / `path` / `status` / `durationMs` / `userId` / `ip` / `userAgent`（5xx は `error`、4xx は `warn`）
+- 監査ログ（`audit: true`）：`auth.login.success` / `auth.login.failure` / `auth.logout` / `auth.forbidden`（403）/ マスタ変更（`customer.*`、`sales_person.*`）
+- 記録しない情報：パスワード、JWT、Cookie、リクエストボディ全文、日報本文、クエリ文字列
+- 保持期間：Vercel Logs の保持期間内。長期保管が必要になった場合は Log Drain で外部へ転送する（現時点では未導入）

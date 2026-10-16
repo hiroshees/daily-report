@@ -8,8 +8,9 @@ import { revokeSession } from '@/server/services/auth'
  */
 export const POST = defineRoute({
   auth: 'none',
-  handler: async ({ request }) => {
-    await revokeSession(request.headers)
+  handler: async ({ request, audit }) => {
+    const userId = await revokeSession(request.headers)
+    audit('auth.logout', { userId })
     return new Response(null, { status: 204, headers: { 'Set-Cookie': clearSessionCookie() } })
   },
 })

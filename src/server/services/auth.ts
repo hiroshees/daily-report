@@ -50,9 +50,9 @@ export function issueSession(userId: number) {
  * 何度呼んでも、トークンが無い・無効でもエラーにしない（冪等）。
  * あわせて、有効期限が切れた失効記録を削除する（期限切れのトークンは署名検証で弾かれるため不要）。
  */
-export async function revokeSession(headers: Headers, now = new Date()): Promise<void> {
+export async function revokeSession(headers: Headers, now = new Date()): Promise<number | null> {
   const credentials = readToken(headers)
-  if (!credentials) return
+  if (!credentials) return null
 
   const verified = await verifySessionToken(credentials.token, now)
   if (verified.ok) {
@@ -64,4 +64,6 @@ export async function revokeSession(headers: Headers, now = new Date()): Promise
     })
   }
   await prisma.revokedToken.deleteMany({ where: { expiresAt: { lt: now } } })
+  // 監査ログ用に、トークンが有効だった場合のユーザーIDを返す
+  return verified.ok ? verified.claims.userId : null
 }

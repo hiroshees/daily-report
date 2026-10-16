@@ -14,8 +14,13 @@ export async function requireAuth(request: Request): Promise<SessionUser> {
 /** 管理者のみ。未ログインなら 401、一般ユーザーなら 403 */
 export async function requireManager(request: Request): Promise<SessionUser> {
   const user = await requireAuth(request)
-  if (!user.isManager) throw new ApiError('FORBIDDEN')
+  assertManager(user)
   return user
+}
+
+/** 管理者でなければ 403 */
+export function assertManager(user: Pick<SessionUser, 'isManager'>): void {
+  if (!user.isManager) throw new ApiError('FORBIDDEN')
 }
 
 /**

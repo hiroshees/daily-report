@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { ZodError, type z } from 'zod'
 import type { SessionUser } from '@/lib/session'
-import { requireAuth, requireManager } from '@/server/auth'
+import { assertManager, requireAuth } from '@/server/auth'
 import { ApiError, ERROR_MESSAGE, type ErrorDetail } from '@/server/errors'
+import { log, requestLogFields, type LogFields } from '@/server/logger'
 
 /** リクエストボディの上限（doc/API_SCHEME.md 5 章: 最大 1MB） */
 export const MAX_BODY_BYTES = 1024 * 1024
@@ -37,6 +38,8 @@ type RouteConfig<
   body?: B
   /** 成功時のステータス。省略時は 200。204 の場合はボディなし */
   status?: 200 | 201 | 204
+  /** マスタ変更など、成功時に監査ログへ記録するイベント名（例: `customer.create`） */
+  auditEvent?: string
   handler: (context: {
     user: A extends 'none' ? null : SessionUser
     params: Output<P>
@@ -44,6 +47,8 @@ type RouteConfig<
     body: Output<B>
     request: Request
     requestId: string
+    /** 監査ログ（認証イベント・マスタ変更など）を記録する。パスワードやトークンは渡さないこと */
+    audit: (event: string, fields?: LogFields) => void
   }) => unknown
 }
 
@@ -118,15 +123,10 @@ function errorResponse(error: unknown, requestId: string): Response {
   }
 
   // 想定外の例外。内容（スタックトレース含む）はレスポンスに出さず、ログにだけ残す
-  // TODO(#23): 構造化ログ（共通のロガー）に置き換える
-  console.error(
-    JSON.stringify({
-      severity: 'ERROR',
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      requestId,
-    }),
-  )
+  log('error', error instanceof Error ? error.message : String(error), {
+    requestId,
+    stack: error instanceof Error ? error.stack : undefined,
+  })
   return jsonResponse(
     { error: { code: 'INTERNAL_ERROR', message: ERROR_MESSAGE.INTERNAL_ERROR } },
     500,
@@ -205,49 +205,73 @@ export function defineRoute<
 >(config: RouteConfig<P, Q, B, A>) {
   return async function route(request: Request, context: RouteContext): Promise<Response> {
     const requestId = resolveRequestId(request)
+    const startedAt = performance.now()
+    const base = requestLogFields(request, requestId)
+    let userId: number | null = null
+    let errorCode: string | undefined
+    const audit = (event: string, fields: LogFields = {}) =>
+      log('info', event, { ...base, userId, ...fields, audit: true })
 
-    try {
-      assertSameOrigin(request)
+    const response = await handle()
+    // 全 API リクエストのアクセスログ。ボディ・Cookie・トークンは含めない
+    log(response.status >= 500 ? 'error' : response.status >= 400 ? 'warn' : 'info', 'access', {
+      ...base,
+      status: response.status,
+      durationMs: Math.round(performance.now() - startedAt),
+      userId,
+      ...(errorCode && { errorCode }),
+    })
+    // 権限エラーは監査として明示的に記録する
+    if (errorCode === 'FORBIDDEN') audit('auth.forbidden', { status: response.status })
+    return response
 
-      // 認証を先に行い、未認証の相手にスキーマの詳細（検証エラー）を教えない
-      const auth = config.auth ?? 'user'
-      const user =
-        auth === 'manager'
-          ? await requireManager(request)
-          : auth === 'user'
-            ? await requireAuth(request)
-            : null
+    async function handle(): Promise<Response> {
+      try {
+        assertSameOrigin(request)
 
-      const params = parse(config.params as P, await context?.params)
-      const query = parse(
-        config.query as Q,
-        Object.fromEntries(new URL(request.url).searchParams.entries()),
-      )
-      const body = config.body ? parse(config.body as B, await readJsonBody(request)) : undefined
+        // 認証を先に行い、未認証の相手にスキーマの詳細（検証エラー）を教えない
+        const auth = config.auth ?? 'user'
+        const user = auth === 'none' ? null : await requireAuth(request)
+        // 権限エラー（403）の監査ログにユーザーIDを残すため、管理者判定の前に記録する
+        userId = user?.id ?? null
+        if (auth === 'manager') assertManager(user!)
 
-      const result = await config.handler({
-        user: user as A extends 'none' ? null : SessionUser,
-        params,
-        query,
-        body: body as Output<B>,
-        request,
-        requestId,
-      })
+        const params = parse(config.params as P, await context?.params)
+        const query = parse(
+          config.query as Q,
+          Object.fromEntries(new URL(request.url).searchParams.entries()),
+        )
+        const body = config.body ? parse(config.body as B, await readJsonBody(request)) : undefined
 
-      if (result instanceof Response) {
-        return new Response(result.body, {
-          status: result.status,
-          headers: responseHeaders(requestId, result.headers),
+        const result = await config.handler({
+          user: user as A extends 'none' ? null : SessionUser,
+          params,
+          query,
+          body: body as Output<B>,
+          request,
+          requestId,
+          audit,
         })
-      }
+        if (config.auditEvent) {
+          audit(config.auditEvent, { targetId: (params as { id?: number } | undefined)?.id })
+        }
 
-      const status = config.status ?? 200
-      if (status === 204) {
-        return new Response(null, { status, headers: responseHeaders(requestId) })
+        if (result instanceof Response) {
+          return new Response(result.body, {
+            status: result.status,
+            headers: responseHeaders(requestId, result.headers),
+          })
+        }
+
+        const status = config.status ?? 200
+        if (status === 204) {
+          return new Response(null, { status, headers: responseHeaders(requestId) })
+        }
+        return jsonResponse(result, status, requestId)
+      } catch (error) {
+        if (error instanceof ApiError) errorCode = error.code
+        return errorResponse(error, requestId)
       }
-      return jsonResponse(result, status, requestId)
-    } catch (error) {
-      return errorResponse(error, requestId)
     }
   }
 }

@@ -15,6 +15,7 @@ export const GET = defineRoute({
 
 export const PUT = defineRoute({
   auth: 'manager',
+  auditEvent: 'sales_person.update',
   params: IdParamSchema,
   body: SalesPersonUpdateRequestSchema,
   handler: ({ params, body }) => updateSalesPerson(params.id, body),
@@ -22,6 +23,7 @@ export const PUT = defineRoute({
 
 export const DELETE = defineRoute({
   auth: 'manager',
+  auditEvent: 'sales_person.delete',
   params: IdParamSchema,
   status: 204,
   handler: ({ params, user }) => deleteSalesPerson(params.id, user.id),

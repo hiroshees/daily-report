@@ -494,9 +494,10 @@ describe('想定外の例外（500 INTERNAL_ERROR）', () => {
     expect(text).not.toContain('stack')
     expect(text).not.toContain('at ')
 
-    expect(consoleError).toHaveBeenCalledTimes(1)
+    // 例外の詳細ログとアクセスログの 2 行
+    expect(consoleError).toHaveBeenCalledTimes(2)
     const log = JSON.parse(consoleError.mock.calls[0]![0] as string)
-    expect(log).toMatchObject({ severity: 'ERROR', requestId: 'req-500' })
+    expect(log).toMatchObject({ level: 'error', requestId: 'req-500' })
     expect(log.message).toContain('secret')
     expect(log.stack).toContain('Error')
   })

@@ -12,6 +12,7 @@ export const GET = defineRoute({
 
 export const POST = defineRoute({
   auth: 'manager',
+  auditEvent: 'customer.create',
   body: CustomerCreateRequestSchema,
   status: 201,
   handler: ({ body }) => createCustomer(body),
