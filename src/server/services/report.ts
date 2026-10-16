@@ -1,8 +1,8 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import type { ReportCreateRequest, ReportUpdateRequest } from '@/schemas/report'
-import { getReportEditLimitDays } from '@/server/env'
 import { ApiError } from '@/server/errors'
+import { isReportEditExpired } from '@/server/report-edit-period'
 
 const toIso = (date: Date) => date.toISOString().replace('.000Z', 'Z')
 
@@ -129,8 +129,6 @@ export async function createReport(salesPersonId: number, input: ReportCreateReq
 const visitIdInvalid = (index: number, message: string) =>
   new ApiError('VALIDATION_ERROR', undefined, [{ field: `visits.${index}.id`, message }])
 
-const DAY_MS = 24 * 60 * 60 * 1000
-
 /** 本人の日報だけを操作対象にする。日報が無ければ 404、他人のものなら 403（管理者も同様） */
 async function findOwnReport(tx: Prisma.TransactionClient, id: number, userId: number) {
   const report = await tx.dailyReport.findUnique({
@@ -165,10 +163,7 @@ export async function updateReport(id: number, userId: number, input: ReportUpda
   try {
     const updated = await prisma.$transaction(async (tx) => {
       const report = await findOwnReport(tx, id, userId)
-      const limitMs = getReportEditLimitDays() * DAY_MS
-      if (Date.now() - report.createdAt.getTime() > limitMs) {
-        throw new ApiError('EDIT_PERIOD_EXPIRED')
-      }
+      if (isReportEditExpired(report.createdAt)) throw new ApiError('EDIT_PERIOD_EXPIRED')
 
       // 既存の訪問記録 id は、この日報に属するものだけ指定できる（他日報の id 混入・重複指定は 400）
       const owned = await tx.visitRecord.findMany({

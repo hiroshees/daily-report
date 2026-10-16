@@ -16,7 +16,7 @@ export default async function Page() {
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-bold">日報作成</h1>
-      <ReportForm reportDate={today} authorName={user.name} />
+      <ReportForm mode="create" reportDate={today} authorName={user.name} />
     </div>
   )
 }
