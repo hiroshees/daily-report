@@ -101,6 +101,62 @@ describe('CommentForm', () => {
     expect(router.refresh).not.toHaveBeenCalled()
   })
 
+  it('400 で comment 以外の項目のエラーだけでも、無言にせずフォーム全体に表示する', async () => {
+    post.mockResolvedValue(
+      failure(400, {
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: '入力値が不正です',
+          details: [{ field: 'report_id', message: '日報の指定が正しくありません' }],
+        },
+      }),
+    )
+    const user = userEvent.setup()
+    render(<CommentForm reportId={42} />)
+    await user.type(input(), '確認しました')
+    await waitFor(() => expect(submit()).toBeEnabled())
+    await user.click(submit())
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('日報の指定が正しくありません')
+    expect(input()).toHaveValue('確認しました')
+  })
+
+  it('400 で comment のエラーは入力欄に表示する', async () => {
+    post.mockResolvedValue(
+      failure(400, {
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: '入力値が不正です',
+          details: [{ field: 'comment', message: 'コメントは500文字以内で入力してください' }],
+        },
+      }),
+    )
+    const user = userEvent.setup()
+    render(<CommentForm reportId={42} />)
+    await user.type(input(), '確認しました')
+    await waitFor(() => expect(submit()).toBeEnabled())
+    await user.click(submit())
+
+    expect(await screen.findByText('コメントは500文字以内で入力してください')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('投稿中は入力欄を編集できず、完了後に編集できる', async () => {
+    let resolve!: (value: ReturnType<typeof ok>) => void
+    post.mockReturnValue(new Promise((r) => (resolve = r)))
+    const user = userEvent.setup()
+    render(<CommentForm reportId={42} />)
+    await user.type(input(), '確認しました')
+    await waitFor(() => expect(submit()).toBeEnabled())
+    await user.click(submit())
+
+    await waitFor(() => expect(input()).toHaveAttribute('readonly'))
+
+    resolve(ok())
+    await waitFor(() => expect(input()).not.toHaveAttribute('readonly'))
+    expect(input()).toHaveValue('')
+  })
+
   it('通信エラー時は汎用メッセージを表示し、再投稿できる', async () => {
     post.mockRejectedValue(new Error('network'))
     const user = userEvent.setup()

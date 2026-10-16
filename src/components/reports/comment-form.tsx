@@ -61,9 +61,13 @@ export function CommentForm({ reportId }: { reportId: number }) {
       }
 
       if (response.status === 400 && error?.error.details?.length) {
+        // コメント欄に対応するエラーは入力欄に、それ以外はフォーム全体に表示する（無言で失敗させない）
+        const unmatched: string[] = []
         for (const { field, message } of error.error.details) {
           if (field === 'comment') form.setError('comment', { message })
+          else unmatched.push(message)
         }
+        if (unmatched.length) setFormError(unmatched.join(' / '))
         return
       }
 
@@ -87,7 +91,8 @@ export function CommentForm({ reportId }: { reportId: number }) {
             <FormItem>
               <FormLabel>コメントを追加</FormLabel>
               <FormControl>
-                <Textarea rows={3} {...field} />
+                {/* 投稿中に打った内容が、成功時のクリアで消えないよう編集不可にする */}
+                <Textarea rows={3} readOnly={isSubmitting} {...field} />
               </FormControl>
               <p
                 className={cn(
