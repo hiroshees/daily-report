@@ -41,41 +41,54 @@ export function CustomerCombobox({
   useEffect(() => {
     if (!open) return
     let cancelled = false
+    // デバウンス待ちの間も「検索中」とし、前の結果と「該当なし」が混ざらないようにする
+    setLoading(true)
+    setFailed(false)
     const timer = setTimeout(async () => {
-      setLoading(true)
-      setFailed(false)
       try {
         const { data, response } = await apiClient.GET('/customers', {
           params: { query: { search: search.trim() || undefined, per_page: OPTION_LIMIT } },
         })
         if (cancelled) return
         if (!response.ok || !data) {
+          // 古い候補を選べてしまわないよう、失敗時は候補を空にする
+          setOptions([])
           setFailed(true)
-          return
+        } else {
+          setOptions(data.data.map(({ id, company_name }) => ({ id, company_name })))
         }
-        setOptions(data.data.map(({ id, company_name }) => ({ id, company_name })))
       } catch {
-        if (!cancelled) setFailed(true)
-      } finally {
-        if (!cancelled) setLoading(false)
+        if (cancelled) return
+        setOptions([])
+        setFailed(true)
       }
+      setLoading(false)
     }, SEARCH_DEBOUNCE_MS)
 
-    // 入力が続く間は古いリクエストの結果を捨てる
+    // 入力が続く間・閉じたときは、古いリクエストの結果を捨てる
     return () => {
       cancelled = true
       clearTimeout(timer)
     }
   }, [open, search])
 
+  function handleOpenChange(next: boolean) {
+    setOpen(next)
+    // 開くたびに前回の検索状態を持ち越さない。閉じたときは進行中の検索表示を残さない
+    setSearch('')
+    setOptions([])
+    setFailed(false)
+    setLoading(false)
+  }
+
   function select(option: CustomerOption) {
     setSelectedName(option.company_name)
     onChange(option.id)
-    setOpen(false)
+    handleOpenChange(false)
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           id={id}

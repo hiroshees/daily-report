@@ -2,9 +2,10 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Trash2 } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
-import { useFieldArray, useForm, useWatch, type Resolver } from 'react-hook-form'
+import { useState } from 'react'
+import { useFieldArray, useForm, useWatch, type FieldPath, type Resolver } from 'react-hook-form'
 import { toast } from 'sonner'
 import { FormError } from '@/components/common/form-error'
 import { CustomerCombobox } from '@/components/reports/customer-combobox'
@@ -21,7 +22,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { apiClient } from '@/lib/api-client'
-import { formatFullDate } from '@/lib/date'
+import { formatFullDate, todayInJst } from '@/lib/date'
+import { useUnsavedChangesGuard } from '@/lib/use-unsaved-changes-guard'
 import { cn } from '@/lib/utils'
 import { countChars } from '@/schemas/fields'
 import { PLAN_MAX_LENGTH, PROBLEM_MAX_LENGTH, VISIT_CONTENT_MAX_LENGTH } from '@/schemas/report'
@@ -57,8 +59,10 @@ function CharCounter({ value, max }: { value: string; max: number }) {
 }
 
 /** 日報作成フォーム（SC003）。訪問記録は動的に追加・削除できる */
-export function ReportForm({ reportDate, authorName }: ReportFormProps) {
+export function ReportForm({ reportDate: initialDate, authorName }: ReportFormProps) {
   const router = useRouter()
+  // 日付をまたいで開きっぱなしにした場合は、送信時に最新の「本日」へ更新する
+  const [reportDate, setReportDate] = useState(initialDate)
   const [formError, setFormError] = useState<string | null>(null)
   // 保存成功後は、画面遷移が終わるまで離脱確認とボタン操作を止める
   const [saved, setSaved] = useState(false)
@@ -78,26 +82,30 @@ export function ReportForm({ reportDate, authorName }: ReportFormProps) {
   const { isSubmitting, isValid, isDirty } = form.formState
   const visits = useWatch({ control: form.control, name: 'visits' })
 
-  // 未保存のまま離脱（リロード・タブを閉じる）する場合はブラウザの確認を出す
-  useEffect(() => {
-    if (!isDirty || saved) return
-    const handler = (event: BeforeUnloadEvent) => event.preventDefault()
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
-  }, [isDirty, saved])
+  // 未保存のまま離脱する場合は確認する（保存成功後は遷移を妨げない）
+  useUnsavedChangesGuard(isDirty && !saved, LEAVE_CONFIRM)
 
   async function onSubmit(values: ReportFormSchemaOutput) {
     // 二重送信の防止（ボタンの非活性化に加え、Enter キーなどでの再送信も止める）
     if (isSubmitting || saved) return
     setFormError(null)
+
+    // 画面を開いたまま日付が変わった場合は、本日付の日報として保存する（画面の日付も更新する）
+    const today = todayInJst()
+    if (today !== reportDate) {
+      setReportDate(today)
+      toast.info(`日付が変わったため、${formatFullDate(today)} の日報として保存します`)
+    }
+
     try {
       const { response, error } = await apiClient.POST('/reports', {
-        body: toCreateRequest(values, reportDate),
+        body: toCreateRequest(values, today),
       })
 
       if (response.ok) {
         setSaved(true)
         toast.success('日報を保存しました')
+        // 遷移に失敗しても操作不能にならないよう、下の「一覧へ移動」リンクを案内する
         router.push('/reports')
         router.refresh()
         return
@@ -109,10 +117,13 @@ export function ReportForm({ reportDate, authorName }: ReportFormProps) {
       }
 
       if (response.status === 400 && error?.error.details?.length) {
+        // 項目に対応するエラーは該当の入力欄に、対応できないものはフォーム全体に表示する
+        const unmatched: string[] = []
         for (const { field, message } of error.error.details) {
-          if (field === 'problem' || field === 'plan') form.setError(field, { message })
+          if (isFormField(field)) form.setError(field, { message })
+          else unmatched.push(message)
         }
-        setFormError(error.error.message)
+        setFormError(unmatched.length ? unmatched.join(' / ') : error.error.message)
         return
       }
 
@@ -128,6 +139,13 @@ export function ReportForm({ reportDate, authorName }: ReportFormProps) {
   }
 
   const busy = isSubmitting || saved
+
+  /** API のエラー位置（`visits.0.visit_content` 形式）が、フォームの入力欄に対応するか */
+  function isFormField(field: string): field is FieldPath<ReportFormValues> {
+    if (field === 'problem' || field === 'plan') return true
+    const match = /^visits\.(\d+)\.(customer_id|visit_time|visit_content)$/.exec(field)
+    return match !== null && Number(match[1]) < fields.length
+  }
 
   return (
     <Form {...form}>
@@ -287,6 +305,15 @@ export function ReportForm({ reportDate, authorName }: ReportFormProps) {
             />
           </CardContent>
         </Card>
+
+        {saved && (
+          <p role="status" className="text-muted-foreground text-right text-sm">
+            保存しました。一覧へ移動しています…{' '}
+            <Link href="/reports" className="text-foreground underline">
+              移動しない場合はこちら
+            </Link>
+          </p>
+        )}
 
         <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={cancel} disabled={busy}>

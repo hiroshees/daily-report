@@ -7,7 +7,13 @@ import { apiClient } from '@/lib/api-client'
 const router = { push: vi.fn(), refresh: vi.fn() }
 vi.mock('next/navigation', () => ({ useRouter: () => router }))
 vi.mock('@/lib/api-client', () => ({ apiClient: { POST: vi.fn() } }))
-vi.mock('sonner', () => ({ toast: { success: vi.fn() } }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), info: vi.fn() } }))
+// 「本日」を差し替えられるようにする（日付をまたぐ場合の確認用）
+const todayInJst = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/date', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/date')>()),
+  todayInJst,
+}))
 // 顧客の検索 UI は customer-combobox.test.tsx で確認する。ここでは選択だけを再現する
 vi.mock('@/components/reports/customer-combobox', () => ({
   CustomerCombobox: ({ value, onChange }: { value?: number; onChange: (id: number) => void }) => (
@@ -48,6 +54,7 @@ async function fillRequired(user: ReturnType<typeof userEvent.setup>) {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  todayInJst.mockReturnValue('2025-07-27')
 })
 
 describe('ReportForm（SC003）', () => {
@@ -215,6 +222,60 @@ describe('ReportForm（SC003）', () => {
 
     resolve(ok())
     await waitFor(() => expect(router.push).toHaveBeenCalled())
+  })
+
+  it('画面を開いたまま日付が変わったら、送信時に本日付へ更新して保存する', async () => {
+    post.mockResolvedValue(ok())
+    const user = renderForm()
+    await fillRequired(user)
+    await waitFor(() => expect(saveButton()).toBeEnabled())
+
+    todayInJst.mockReturnValue('2025-07-28')
+    await user.click(saveButton())
+
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0]![1].body.report_date).toBe('2025-07-28')
+    expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('2025/07/28'))
+    expect(screen.getByText('2025/07/28')).toBeInTheDocument()
+  })
+
+  it('400 の訪問記録のエラーを、該当の入力欄に表示する', async () => {
+    post.mockResolvedValue(
+      failure(400, {
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: '入力値が不正です',
+          details: [
+            { field: 'visits.0.visit_content', message: '訪問内容は500文字以内で入力してください' },
+            { field: 'unknown', message: '想定外の項目のエラー' },
+          ],
+        },
+      }),
+    )
+    const user = renderForm()
+    await fillRequired(user)
+    await user.click(screen.getByRole('button', { name: '訪問記録を追加' }))
+    await user.click(screen.getByRole('button', { name: '顧客を選択' }))
+    await user.type(screen.getByLabelText('訪問内容'), '提案')
+    await waitFor(() => expect(saveButton()).toBeEnabled())
+    await user.click(saveButton())
+
+    expect(await screen.findByText('訪問内容は500文字以内で入力してください')).toBeInTheDocument()
+    // 入力欄に対応できないエラーは、フォーム全体のエラーに出す
+    expect(screen.getByRole('alert')).toHaveTextContent('想定外の項目のエラー')
+  })
+
+  it('保存後に画面遷移が起きなくても、一覧への案内リンクを表示する', async () => {
+    post.mockResolvedValue(ok())
+    const user = renderForm()
+    await fillRequired(user)
+    await waitFor(() => expect(saveButton()).toBeEnabled())
+    await user.click(saveButton())
+
+    expect(await screen.findByRole('link', { name: '移動しない場合はこちら' })).toHaveAttribute(
+      'href',
+      '/reports',
+    )
   })
 
   it('キャンセルで一覧へ戻る。入力がある場合は確認し、拒否したら留まる', async () => {

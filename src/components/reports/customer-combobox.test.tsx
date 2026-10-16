@@ -81,4 +81,35 @@ describe('CustomerCombobox', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('顧客の取得に失敗しました')
   })
+
+  it('取得に失敗したら、前の検索結果を候補に残さない', async () => {
+    get.mockResolvedValueOnce(list()).mockRejectedValue(new Error('network'))
+    const user = userEvent.setup()
+    render(<CustomerCombobox value={undefined} onChange={vi.fn()} />)
+
+    await user.click(screen.getByRole('combobox'))
+    expect(await screen.findByRole('button', { name: 'ABC商事' })).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('顧客を検索'), 'X')
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'ABC商事' })).not.toBeInTheDocument()
+  })
+
+  it('検索の途中で閉じても「検索中」が残らず、開き直すと検索語をリセットする', async () => {
+    get.mockReturnValue(new Promise(() => {}))
+    const user = userEvent.setup()
+    render(<CustomerCombobox value={undefined} onChange={vi.fn()} />)
+
+    await user.click(screen.getByRole('combobox'))
+    await user.type(screen.getByLabelText('顧客を検索'), 'ABC')
+    await user.keyboard('{Escape}')
+
+    get.mockResolvedValue(list([]))
+    await user.click(screen.getByRole('combobox'))
+
+    expect(screen.getByLabelText('顧客を検索')).toHaveValue('')
+    expect(await screen.findByText('該当する顧客がありません')).toBeInTheDocument()
+    expect(screen.queryByText('検索中…')).not.toBeInTheDocument()
+  })
 })
