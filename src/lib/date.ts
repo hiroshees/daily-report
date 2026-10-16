@@ -12,3 +12,8 @@ export function formatReportDate(date: string, today: string = todayInJst()): st
   const sameYear = date.slice(0, 4) === today.slice(0, 4)
   return format(target, sameYear ? 'M/d' : 'yyyy/M/d')
 }
+
+/** 日付の表示。`yyyy/MM/dd` 形式（画面定義書の日報作成・詳細画面の表記） */
+export function formatFullDate(date: string): string {
+  return format(parseISO(date), 'yyyy/MM/dd')
+}
