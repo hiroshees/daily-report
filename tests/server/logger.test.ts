@@ -37,6 +37,11 @@ describe('log', () => {
     for (const secret of ['p4ssw0rd!', 'jwt', '商談内容']) expect(out).not.toContain(secret)
   })
 
+  it('シリアライズに失敗しても例外を投げない', () => {
+    expect(() => log('info', 'x', { n: BigInt(1) })).not.toThrow()
+    expect(lines[0]).toMatchObject({ message: 'x', logError: true })
+  })
+
   it('予約フィールドは fields で上書きできない', () => {
     log('info', 'real', { level: 'error', message: 'fake' })
     expect(lines[0]).toMatchObject({ level: 'info', message: 'real' })
@@ -117,6 +122,12 @@ describe('defineRoute のアクセスログ', () => {
     })
     await ng(new Request('http://localhost/api/v1/x', { method: 'PUT' }), NO_PARAMS)
     expect(lines.some((l) => l.message === 'customer.update')).toBe(false)
+  })
+
+  it('作成系は作成されたリソースの ID を targetId に残す', async () => {
+    const route = defineRoute({ auditEvent: 'customer.create', handler: () => ({ id: 42 }) })
+    await route(new Request('http://localhost/api/v1/x', { method: 'POST' }), NO_PARAMS)
+    expect(lines.find((l) => l.message === 'customer.create')).toMatchObject({ targetId: 42 })
   })
 
   it('想定外の例外は error レベルで出力する', async () => {

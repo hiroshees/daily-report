@@ -41,17 +41,21 @@ function sanitize(fields: LogFields): LogFields {
 /** 1 行の JSON として出力する。error は stderr、それ以外は stdout */
 export function log(level: LogLevel, message: string, fields: LogFields = {}): void {
   // 予約フィールド（time / level / message）は fields で上書きさせない
-  const line = JSON.stringify({
-    ...sanitize(fields),
-    time: new Date().toISOString(),
-    level,
-    message,
-  })
+  let line: string
+  try {
+    line = JSON.stringify({ ...sanitize(fields), time: new Date().toISOString(), level, message })
+  } catch {
+    // 循環参照・BigInt などで失敗しても、ログ出力が原因でリクエストを失敗させない
+    line = JSON.stringify({ time: new Date().toISOString(), level, message, logError: true })
+  }
   if (level === 'error') console.error(line)
   else console.log(line)
 }
 
-/** プロキシ経由のクライアント IP（`X-Forwarded-For` の先頭）。取れなければ null */
+/**
+ * プロキシ経由のクライアント IP（`X-Forwarded-For` の先頭）。取れなければ null。
+ * Vercel 上ではヘッダーが上書きされるため信頼できるが、それ以外の環境ではクライアントが偽装できる。
+ */
 export function getClientIp(headers: Headers): string | null {
   const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim()
   return forwarded || headers.get('x-real-ip') || null

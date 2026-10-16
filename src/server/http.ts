@@ -52,6 +52,12 @@ type RouteConfig<
   }) => unknown
 }
 
+/** 作成系のレスポンス（`{ id }`）から、作成されたリソースの ID を取り出す（監査ログ用） */
+function createdId(result: unknown): number | undefined {
+  const id = (result as { id?: unknown } | null)?.id
+  return typeof id === 'number' ? id : undefined
+}
+
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
 /**
@@ -212,19 +218,6 @@ export function defineRoute<
     const audit = (event: string, fields: LogFields = {}) =>
       log('info', event, { ...base, userId, ...fields, audit: true })
 
-    const response = await handle()
-    // 全 API リクエストのアクセスログ。ボディ・Cookie・トークンは含めない
-    log(response.status >= 500 ? 'error' : response.status >= 400 ? 'warn' : 'info', 'access', {
-      ...base,
-      status: response.status,
-      durationMs: Math.round(performance.now() - startedAt),
-      userId,
-      ...(errorCode && { errorCode }),
-    })
-    // 権限エラーは監査として明示的に記録する
-    if (errorCode === 'FORBIDDEN') audit('auth.forbidden', { status: response.status })
-    return response
-
     async function handle(): Promise<Response> {
       try {
         assertSameOrigin(request)
@@ -253,7 +246,9 @@ export function defineRoute<
           audit,
         })
         if (config.auditEvent) {
-          audit(config.auditEvent, { targetId: (params as { id?: number } | undefined)?.id })
+          audit(config.auditEvent, {
+            targetId: (params as { id?: number } | undefined)?.id ?? createdId(result),
+          })
         }
 
         if (result instanceof Response) {
@@ -273,5 +268,18 @@ export function defineRoute<
         return errorResponse(error, requestId)
       }
     }
+
+    const response = await handle()
+    // 全 API リクエストのアクセスログ。ボディ・Cookie・トークンは含めない
+    log(response.status >= 500 ? 'error' : response.status >= 400 ? 'warn' : 'info', 'access', {
+      ...base,
+      status: response.status,
+      durationMs: Math.round(performance.now() - startedAt),
+      userId,
+      ...(errorCode && { errorCode }),
+    })
+    // 権限エラーは監査として明示的に記録する
+    if (errorCode === 'FORBIDDEN') audit('auth.forbidden', { status: response.status })
+    return response
   }
 }
