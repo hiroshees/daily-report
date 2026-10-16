@@ -1,3 +1,4 @@
+import { CustomerCreateRequestSchema } from '@/schemas/customer'
 import {
   CustomerFormSchema,
   EMPTY_CUSTOMER,
@@ -86,5 +87,33 @@ describe('toCustomerFormValues', () => {
       email: 'a@b.co',
       address: '',
     })
+  })
+})
+
+describe('API のスキーマとの整合', () => {
+  // フォームだけ有効で API が拒否する、またはその逆にならないよう、上限ちょうどと +1 で比べる
+  const edge = (length: number) => ({
+    company_name: 'あ'.repeat(length),
+    contact_person: 'あ'.repeat(length),
+    phone: '1'.repeat(length),
+    email: 'a'.repeat(length - 8) + '@abc.com',
+    address: 'あ'.repeat(length),
+  })
+
+  it.each([
+    ['会社名', 'company_name', 200],
+    ['担当者名', 'contact_person', 100],
+    ['電話番号', 'phone', 30],
+    ['メールアドレス', 'email', 255],
+    ['住所', 'address', 500],
+  ] as const)('%s の上限（%i 文字）はフォームと API で一致する', (_label, key, max) => {
+    const base = { ...EMPTY_CUSTOMER, company_name: '会社' }
+    const at = (length: number) => ({ ...base, [key]: edge(length)[key] })
+
+    for (const length of [max, max + 1]) {
+      const formOk = CustomerFormSchema.safeParse(at(length)).success
+      const apiOk = CustomerCreateRequestSchema.safeParse(toCustomerRequest(at(length))).success
+      expect(formOk).toBe(apiOk)
+    }
   })
 })

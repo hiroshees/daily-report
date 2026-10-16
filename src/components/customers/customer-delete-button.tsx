@@ -50,6 +50,14 @@ export function CustomerDeleteButton({
         router.refresh()
         return
       }
+
+      // 別の管理者が先に削除していた場合。行は一覧から消えるため、通知して一覧を再取得する
+      if (response.status === 404) {
+        toast.info('この顧客は既に削除されています')
+        setOpen(false)
+        router.refresh()
+        return
+      }
       setError(apiError?.error.message ?? GENERIC_ERROR)
     } catch {
       setError(GENERIC_ERROR)
@@ -62,6 +70,8 @@ export function CustomerDeleteButton({
     <AlertDialog
       open={open}
       onOpenChange={(next) => {
+        // 削除の通信中は閉じさせない（完了後のエラー表示やトーストが宙に浮かないようにする）
+        if (deleting) return
         setOpen(next)
         if (!next) setError(null)
       }}

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { Suspense } from 'react'
 import { FormError } from '@/components/common/form-error'
 import { ForbiddenView } from '@/components/common/error-view'
@@ -48,7 +49,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
           <CustomerResults query={parsed.data} href={href} />
         </Suspense>
       ) : (
-        <FormError message={parsed.error.issues[0]?.message ?? '検索条件が不正です'} />
+        <div className="space-y-3">
+          <FormError message={parsed.error.issues[0]?.message ?? '検索条件が不正です'} />
+          <Button asChild variant="outline" size="sm">
+            <Link href="/customers">条件をクリアして一覧に戻る</Link>
+          </Button>
+        </div>
       )}
     </div>
   )

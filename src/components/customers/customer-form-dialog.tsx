@@ -36,6 +36,13 @@ export function CustomerFormDialog({ customerId, trigger }: CustomerFormDialogPr
     router.refresh()
   }
 
+  /** 開こうとした顧客が、別の管理者に削除されていた場合。再取得しても同じなので、閉じて一覧を最新にする */
+  function notFound() {
+    toast.error('この顧客は存在しません（削除された可能性があります）')
+    setOpen(false)
+    router.refresh()
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
@@ -48,7 +55,12 @@ export function CustomerFormDialog({ customerId, trigger }: CustomerFormDialogPr
         </DialogHeader>
         {/* 閉じるとアンマウントされ、開くたびに入力内容・取得結果がリセットされる */}
         {isEdit ? (
-          <EditLoader customerId={customerId} onSaved={saved} onCancel={() => setOpen(false)} />
+          <EditLoader
+            customerId={customerId}
+            onSaved={saved}
+            onCancel={() => setOpen(false)}
+            onNotFound={notFound}
+          />
         ) : (
           <CustomerForm onSaved={saved} onCancel={() => setOpen(false)} />
         )}
@@ -64,10 +76,12 @@ function EditLoader({
   customerId,
   onSaved,
   onCancel,
+  onNotFound,
 }: {
   customerId: number
   onSaved: () => void
   onCancel: () => void
+  onNotFound: () => void
 }) {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
@@ -80,6 +94,10 @@ function EditLoader({
           params: { path: { id: customerId } },
         })
         if (cancelled) return
+        if (response.status === 404) {
+          onNotFound()
+          return
+        }
         setState(
           response.ok && data
             ? { status: 'ready', values: toCustomerFormValues(data) }
@@ -93,6 +111,8 @@ function EditLoader({
     return () => {
       cancelled = true
     }
+    // onNotFound は親の再描画で作り直されるため、依存に含めない（取得のやり直しを避ける）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId, attempt])
 
   if (state.status === 'loading') {

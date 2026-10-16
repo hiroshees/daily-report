@@ -10,7 +10,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => router }))
 vi.mock('@/lib/api-client', () => ({
   apiClient: { GET: vi.fn(), POST: vi.fn(), PUT: vi.fn() },
 }))
-vi.mock('sonner', () => ({ toast: { success: vi.fn() } }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 const get = vi.mocked(apiClient.GET) as unknown as ReturnType<typeof vi.fn>
 const post = vi.mocked(apiClient.POST) as unknown as ReturnType<typeof vi.fn>
@@ -98,6 +98,23 @@ describe('CustomerFormDialog（編集）', () => {
     await waitFor(() => expect(router.refresh).toHaveBeenCalled())
     expect(toast.success).toHaveBeenCalledWith('顧客を更新しました')
     expect(put.mock.calls[0]![1].body.phone).toBe('03-0000-0000')
+  })
+
+  it('取得で 404（削除済み）なら、通知してダイアログを閉じ、一覧を再取得する', async () => {
+    get.mockResolvedValue({
+      response: new Response(null, { status: 404 }),
+      data: undefined,
+      error: { error: { code: 'NOT_FOUND', message: 'リソースが見つかりません' } },
+    })
+    const user = userEvent.setup()
+    render(<CustomerFormDialog customerId={7} trigger={trigger} />)
+
+    await user.click(screen.getByRole('button', { name: '編集' }))
+
+    await waitFor(() => expect(router.refresh).toHaveBeenCalled())
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('この顧客は存在しません'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(get).toHaveBeenCalledTimes(1)
   })
 
   it('取得に失敗したらエラーと再読み込みを表示し、再読み込みで取得し直す', async () => {

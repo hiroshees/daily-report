@@ -28,13 +28,19 @@ export const CustomerSchema = CustomerSummarySchema.extend({
   updated_at: dateTimeField,
 }).openapi('Customer')
 
+// 文字数の上限（顧客フォームの検証と共有する）
+export const COMPANY_NAME_MAX_LENGTH = 200
+export const CONTACT_PERSON_MAX_LENGTH = 100
+export const PHONE_MAX_LENGTH = 30
+export const ADDRESS_MAX_LENGTH = 500
+
 // 会社名以外の必須/任意は未確定（#27）のため、現状は任意としている（DB も同様）
 const customerBody = {
-  company_name: requiredString('会社名', 200),
-  contact_person: optionalString('担当者名', 100),
-  phone: optionalString('電話番号', 30),
+  company_name: requiredString('会社名', COMPANY_NAME_MAX_LENGTH),
+  contact_person: optionalString('担当者名', CONTACT_PERSON_MAX_LENGTH),
+  phone: optionalString('電話番号', PHONE_MAX_LENGTH),
   email: optionalEmailField(),
-  address: optionalString('住所', 500),
+  address: optionalString('住所', ADDRESS_MAX_LENGTH),
 }
 
 export const CustomerCreateRequestSchema = z.object(customerBody).openapi('CustomerCreateRequest')

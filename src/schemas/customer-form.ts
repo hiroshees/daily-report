@@ -1,10 +1,16 @@
-import { countChars, messages, requiredString } from '@/schemas/fields'
-import type { CustomerCreateRequest } from '@/schemas/customer'
+import {
+  ADDRESS_MAX_LENGTH,
+  COMPANY_NAME_MAX_LENGTH,
+  CONTACT_PERSON_MAX_LENGTH,
+  PHONE_MAX_LENGTH,
+  type CustomerCreateRequest,
+} from '@/schemas/customer'
+import { countChars, EMAIL_MAX_LENGTH, messages, requiredString } from '@/schemas/fields'
 import { z } from '@/schemas/zod'
 
 /**
  * 顧客フォーム（登録・編集ダイアログ）の入力値の検証。
- * 文字数の上限は API のスキーマ（customer.ts）と同じ。任意項目は未入力（空文字）を許可する。
+ * 文字数の上限は API のスキーマ（customer.ts）の定数を共有する。任意項目は未入力（空文字）を許可する。
  * 会社名以外の必須/任意は未確定（#27）のため、現状は任意としている。
  */
 const optionalText = (label: string, max: number) =>
@@ -13,14 +19,14 @@ const optionalText = (label: string, max: number) =>
   })
 
 export const CustomerFormSchema = z.object({
-  company_name: requiredString('会社名', 200),
-  contact_person: optionalText('担当者名', 100),
-  phone: optionalText('電話番号', 30),
-  email: optionalText('メールアドレス', 255).refine(
+  company_name: requiredString('会社名', COMPANY_NAME_MAX_LENGTH),
+  contact_person: optionalText('担当者名', CONTACT_PERSON_MAX_LENGTH),
+  phone: optionalText('電話番号', PHONE_MAX_LENGTH),
+  email: optionalText('メールアドレス', EMAIL_MAX_LENGTH).refine(
     (value) => value.trim() === '' || z.email().safeParse(value.trim()).success,
     { error: messages.invalidFormat('メールアドレス') },
   ),
-  address: optionalText('住所', 500),
+  address: optionalText('住所', ADDRESS_MAX_LENGTH),
 })
 
 export type CustomerFormValues = z.infer<typeof CustomerFormSchema>

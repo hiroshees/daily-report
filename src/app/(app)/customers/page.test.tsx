@@ -69,6 +69,10 @@ describe('顧客マスタ管理ページ', () => {
     await renderPage({ page: 'abc' })
 
     expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '条件をクリアして一覧に戻る' })).toHaveAttribute(
+      'href',
+      '/customers',
+    )
     expect(screen.queryByTestId('results')).not.toBeInTheDocument()
   })
 })

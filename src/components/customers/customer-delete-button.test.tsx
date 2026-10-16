@@ -7,7 +7,7 @@ import { apiClient } from '@/lib/api-client'
 const router = { refresh: vi.fn() }
 vi.mock('next/navigation', () => ({ useRouter: () => router }))
 vi.mock('@/lib/api-client', () => ({ apiClient: { DELETE: vi.fn() } }))
-vi.mock('sonner', () => ({ toast: { success: vi.fn() } }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), info: vi.fn() } }))
 
 const del = vi.mocked(apiClient.DELETE) as unknown as ReturnType<typeof vi.fn>
 
@@ -75,6 +75,32 @@ describe('CustomerDeleteButton', () => {
     )
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
     expect(router.refresh).not.toHaveBeenCalled()
+  })
+
+  it('既に削除されていた(404)ら、通知して閉じ、一覧を再取得する', async () => {
+    del.mockResolvedValue(
+      failure(404, { error: { code: 'NOT_FOUND', message: 'リソースが見つかりません' } }),
+    )
+    const user = await openDialog()
+    await user.click(screen.getByRole('button', { name: '削除する' }))
+
+    await waitFor(() => expect(router.refresh).toHaveBeenCalled())
+    expect(toast.info).toHaveBeenCalledWith('この顧客は既に削除されています')
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
+  it('削除の通信中は、Escape でも閉じられない', async () => {
+    let resolve!: (value: ReturnType<typeof ok>) => void
+    del.mockReturnValue(new Promise((r) => (resolve = r)))
+    const user = await openDialog()
+    await user.click(screen.getByRole('button', { name: '削除する' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '削除中…' })).toBeDisabled())
+
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+
+    resolve(ok())
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
   })
 
   it('開き直すと前回のエラーは消えている', async () => {

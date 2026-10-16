@@ -45,15 +45,23 @@ export function optionalString(label: string, max: number) {
     .nullish()
 }
 
+export const EMAIL_MAX_LENGTH = 255
+
 function emailBase(label: string) {
   return z
     .string({ error: typeError(label) })
     .refine((value) => value.trim().length > 0, { error: messages.required(label), abort: true })
-    .refine((value) => countChars(value) <= 255, { error: messages.maxLength(label, 255) })
+    .refine((value) => countChars(value) <= EMAIL_MAX_LENGTH, {
+      error: messages.maxLength(label, EMAIL_MAX_LENGTH),
+    })
     .pipe(z.email({ error: messages.invalidFormat(label) }))
 }
 
-const EMAIL_DOC = { format: 'email', maxLength: 255, example: 'yamada@example.com' } as const
+const EMAIL_DOC = {
+  format: 'email',
+  maxLength: EMAIL_MAX_LENGTH,
+  example: 'yamada@example.com',
+} as const
 
 export function emailField(label = 'メールアドレス') {
   return emailBase(label).openapi({ type: 'string', ...EMAIL_DOC })
