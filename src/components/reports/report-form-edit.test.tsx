@@ -160,6 +160,10 @@ describe('ReportForm（編集 / SC004）', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('編集可能な期間を過ぎています')
     expect(router.push).not.toHaveBeenCalled()
+    // 再送信しても保存できないため、保存ボタンを押せなくする。キャンセルは使える
+    expect(saveButton()).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'キャンセル' })).toBeEnabled()
+    expect(put).toHaveBeenCalledTimes(1)
   })
 
   it('他人の日報(403)のメッセージを表示する', async () => {
@@ -172,6 +176,36 @@ describe('ReportForm（編集 / SC004）', () => {
     await user.click(saveButton())
 
     expect(await screen.findByRole('alert')).toHaveTextContent('この操作を行う権限がありません')
+    expect(saveButton()).toBeDisabled()
+  })
+
+  it('日報が削除済み(404)なら、メッセージを表示して保存できなくする', async () => {
+    put.mockResolvedValue(
+      failure(404, { error: { code: 'NOT_FOUND', message: 'リソースが見つかりません' } }),
+    )
+    const user = renderForm()
+    await user.type(screen.getByLabelText('課題・相談'), '追記')
+    await waitFor(() => expect(saveButton()).toBeEnabled())
+    await user.click(saveButton())
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('リソースが見つかりません')
+    expect(saveButton()).toBeDisabled()
+  })
+
+  it('一時的な失敗(500)は、保存ボタンを押せるままにして再送信できる', async () => {
+    put.mockResolvedValueOnce(
+      failure(500, { error: { code: 'INTERNAL_ERROR', message: 'サーバーエラーが発生しました' } }),
+    )
+    put.mockResolvedValueOnce(ok())
+    const user = renderForm()
+    await user.type(screen.getByLabelText('課題・相談'), '追記')
+    await waitFor(() => expect(saveButton()).toBeEnabled())
+    await user.click(saveButton())
+    await screen.findByRole('alert')
+
+    expect(saveButton()).toBeEnabled()
+    await user.click(saveButton())
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/reports/42'))
   })
 
   it('空にした必須項目はエラーにして保存できない', async () => {

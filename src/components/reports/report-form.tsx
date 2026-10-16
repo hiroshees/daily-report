@@ -29,6 +29,7 @@ import { countChars } from '@/schemas/fields'
 import { PLAN_MAX_LENGTH, PROBLEM_MAX_LENGTH, VISIT_CONTENT_MAX_LENGTH } from '@/schemas/report'
 import {
   EMPTY_VISIT,
+  EditReportFormSchema,
   ReportFormSchema,
   toCreateRequest,
   toUpdateRequest,
@@ -37,6 +38,8 @@ import {
 } from '@/schemas/report-form'
 
 const GENERIC_ERROR = '日報の保存に失敗しました。時間をおいてもう一度お試しください。'
+/** 再送信しても成功しない API エラー */
+const UNRECOVERABLE_CODES: readonly string[] = ['EDIT_PERIOD_EXPIRED', 'FORBIDDEN', 'NOT_FOUND']
 const LEAVE_CONFIRM = '入力中の内容は保存されていません。破棄して移動しますか？'
 
 type ReportFormProps = {
@@ -73,23 +76,25 @@ function CharCounter({ value, max }: { value: string; max: number }) {
 export function ReportForm(props: ReportFormProps) {
   const { authorName } = props
   const router = useRouter()
-  // 作成では、日付をまたいで開きっぱなしにした場合に送信時に最新の「本日」へ更新する
-  const [reportDate, setReportDate] = useState(props.reportDate)
+  // 作成のみ：日付をまたいで開きっぱなしにした場合に、送信時に最新の「本日」へ更新する。
+  // 編集の日付は既存のまま変わらない
+  const [createDate, setCreateDate] = useState(props.reportDate)
+  const reportDate = props.mode === 'edit' ? props.reportDate : createDate
   // 保存後・キャンセル後の戻り先（作成は一覧、編集は日報詳細）
   const backHref = props.mode === 'edit' ? `/reports/${props.reportId}` : '/reports'
   const backLabel = props.mode === 'edit' ? '日報詳細' : '一覧'
   const [formError, setFormError] = useState<string | null>(null)
   // 保存成功後は、画面遷移が終わるまで離脱確認とボタン操作を止める
   const [saved, setSaved] = useState(false)
+  // 編集期限切れなど、再送信しても保存できない状態
+  const [locked, setLocked] = useState(false)
   const submittingRef = useRef(false)
 
   const form = useForm<ReportFormValues, unknown, ReportFormSchemaOutput>({
     // 入力途中は顧客が未選択（null）になりうるため、入力型を ReportFormValues に広げる
-    resolver: zodResolver(ReportFormSchema) as Resolver<
-      ReportFormValues,
-      unknown,
-      ReportFormSchemaOutput
-    >,
+    resolver: zodResolver(
+      props.mode === 'edit' ? EditReportFormSchema : ReportFormSchema,
+    ) as Resolver<ReportFormValues, unknown, ReportFormSchemaOutput>,
     // 入力のたびに検証し、不正な間は保存ボタンを押せないようにする（TC-REPORT-004）
     mode: 'onChange',
     defaultValues:
@@ -102,19 +107,18 @@ export function ReportForm(props: ReportFormProps) {
   // 未保存のまま離脱する場合は確認する（保存成功後は遷移を妨げない）
   useUnsavedChangesGuard(isDirty && !saved, LEAVE_CONFIRM)
 
-  /** 保存の API 呼び出し。編集は PUT、作成は POST */
-  function send(values: ReportFormSchemaOutput) {
-    if (props.mode === 'edit') {
-      return apiClient.PUT('/reports/{id}', {
-        params: { path: { id: props.reportId } },
-        body: toUpdateRequest(values),
-      })
-    }
+  function updateReport(reportId: number, values: ReportFormSchemaOutput) {
+    return apiClient.PUT('/reports/{id}', {
+      params: { path: { id: reportId } },
+      body: toUpdateRequest(values),
+    })
+  }
 
+  function createReport(values: ReportFormSchemaOutput) {
     // 画面を開いたまま日付が変わった場合は、本日付の日報として保存する（画面の日付も更新する）
     const today = todayInJst()
-    if (today !== reportDate) {
-      setReportDate(today)
+    if (today !== createDate) {
+      setCreateDate(today)
       toast.info(`日付が変わったため、${formatFullDate(today)} の日報として保存します`)
     }
     return apiClient.POST('/reports', { body: toCreateRequest(values, today) })
@@ -128,7 +132,10 @@ export function ReportForm(props: ReportFormProps) {
     setFormError(null)
 
     try {
-      const { response, error } = await send(values)
+      const { response, error } =
+        props.mode === 'edit'
+          ? await updateReport(props.reportId, values)
+          : await createReport(values)
 
       if (response.ok) {
         setSaved(true)
@@ -136,6 +143,13 @@ export function ReportForm(props: ReportFormProps) {
         // 遷移に失敗しても操作不能にならないよう、下の移動リンクを案内する
         router.push(backHref)
         router.refresh()
+        return
+      }
+
+      // 再送信しても成功しないエラー（期限切れ・権限なし・削除済み）は、保存できないようにする
+      if (error && UNRECOVERABLE_CODES.includes(error.error.code)) {
+        setLocked(true)
+        setFormError(error.error.message)
         return
       }
       submittingRef.current = false
@@ -353,7 +367,7 @@ export function ReportForm(props: ReportFormProps) {
           <Button type="button" variant="outline" onClick={cancel} disabled={busy}>
             キャンセル
           </Button>
-          <Button type="submit" disabled={!isValid || busy}>
+          <Button type="submit" disabled={!isValid || busy || locked}>
             {busy ? '保存中…' : '保存'}
           </Button>
         </div>
