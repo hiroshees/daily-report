@@ -1,6 +1,10 @@
 import { dateTimeField, emailField, idField, passwordField, requiredString } from '@/schemas/fields'
 import { z } from '@/schemas/zod'
 
+// 文字数の上限（営業担当者フォームの検証と共有する）
+export const NAME_MAX_LENGTH = 100
+export const DEPARTMENT_MAX_LENGTH = 100
+
 // 一覧にはページネーションがない（API_SCHEME 3.4）
 // 文字数の上限は DB（prisma/schema.prisma）の VarChar に合わせる
 export const SalesPersonListQuerySchema = z.object({
@@ -28,10 +32,10 @@ export const SalesPersonDetailSchema = SalesPersonSchema.extend({
 
 export const SalesPersonCreateRequestSchema = z
   .object({
-    name: requiredString('氏名', 100),
+    name: requiredString('氏名', NAME_MAX_LENGTH),
     email: emailField(),
     password: passwordField(),
-    department: requiredString('部署', 100),
+    department: requiredString('部署', DEPARTMENT_MAX_LENGTH),
     is_manager: z.boolean().default(false),
   })
   .openapi('SalesPersonCreateRequest')
@@ -42,9 +46,9 @@ export const SalesPersonCreateResponseSchema = SalesPersonSchema.extend({
 
 export const SalesPersonUpdateRequestSchema = z
   .object({
-    name: requiredString('氏名', 100),
+    name: requiredString('氏名', NAME_MAX_LENGTH),
     email: emailField(),
-    department: requiredString('部署', 100),
+    department: requiredString('部署', DEPARTMENT_MAX_LENGTH),
     is_manager: z.boolean(),
   })
   .openapi('SalesPersonUpdateRequest')
