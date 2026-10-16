@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useFieldArray, useForm, useWatch, type FieldPath, type Resolver } from 'react-hook-form'
 import { toast } from 'sonner'
 import { FormError } from '@/components/common/form-error'
@@ -66,6 +66,7 @@ export function ReportForm({ reportDate: initialDate, authorName }: ReportFormPr
   const [formError, setFormError] = useState<string | null>(null)
   // 保存成功後は、画面遷移が終わるまで離脱確認とボタン操作を止める
   const [saved, setSaved] = useState(false)
+  const submittingRef = useRef(false)
 
   const form = useForm<ReportFormValues, unknown, ReportFormSchemaOutput>({
     // 入力途中は顧客が未選択（undefined）になりうるため、入力型を ReportFormValues に広げる
@@ -86,8 +87,10 @@ export function ReportForm({ reportDate: initialDate, authorName }: ReportFormPr
   useUnsavedChangesGuard(isDirty && !saved, LEAVE_CONFIRM)
 
   async function onSubmit(values: ReportFormSchemaOutput) {
-    // 二重送信の防止（ボタンの非活性化に加え、Enter キーなどでの再送信も止める）
-    if (isSubmitting || saved) return
+    // 二重送信の防止。state は再描画まで反映されないため、同期的に更新できる ref で判定する。
+    // 失敗時は解除して再送信できるようにし、成功時は遷移が終わるまで立てたままにする
+    if (submittingRef.current) return
+    submittingRef.current = true
     setFormError(null)
 
     // 画面を開いたまま日付が変わった場合は、本日付の日報として保存する（画面の日付も更新する）
@@ -110,6 +113,7 @@ export function ReportForm({ reportDate: initialDate, authorName }: ReportFormPr
         router.refresh()
         return
       }
+      submittingRef.current = false
 
       if (response.status === 409 && error?.error.code === 'DUPLICATE_REPORT') {
         setFormError('同じ日付の日報が既に存在します')
@@ -129,6 +133,7 @@ export function ReportForm({ reportDate: initialDate, authorName }: ReportFormPr
 
       setFormError(error?.error.message ?? GENERIC_ERROR)
     } catch {
+      submittingRef.current = false
       setFormError(GENERIC_ERROR)
     }
   }
@@ -194,7 +199,7 @@ export function ReportForm({ reportDate: initialDate, authorName }: ReportFormPr
                   <FormField
                     control={form.control}
                     name={`visits.${index}.customer_id`}
-                    render={({ field: customerField, fieldState }) => (
+                    render={({ field: customerField }) => (
                       <FormItem>
                         <FormLabel>顧客名</FormLabel>
                         <FormControl>
@@ -204,7 +209,6 @@ export function ReportForm({ reportDate: initialDate, authorName }: ReportFormPr
                               customerField.onChange(customerId)
                               customerField.onBlur()
                             }}
-                            invalid={Boolean(fieldState.error)}
                           />
                         </FormControl>
                         <FormMessage />

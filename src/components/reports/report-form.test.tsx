@@ -278,6 +278,36 @@ describe('ReportForm（SC003）', () => {
     )
   })
 
+  it('送信中にフォームが再送信されても、API は 1 回しか呼ばない', async () => {
+    post.mockReturnValue(new Promise(() => {}))
+    const user = renderForm()
+    await fillRequired(user)
+    await waitFor(() => expect(saveButton()).toBeEnabled())
+
+    const form = saveButton().closest('form')!
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post).toHaveBeenCalledTimes(1)
+  })
+
+  it('保存に失敗したあとは、同じ内容で再送信できる', async () => {
+    post.mockResolvedValueOnce(failure(500, { error: { code: 'INTERNAL_ERROR', message: 'ng' } }))
+    post.mockResolvedValueOnce(ok())
+    const user = renderForm()
+    await fillRequired(user)
+    await waitFor(() => expect(saveButton()).toBeEnabled())
+
+    await user.click(saveButton())
+    await screen.findByRole('alert')
+    await user.click(saveButton())
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/reports'))
+    expect(post).toHaveBeenCalledTimes(2)
+  })
+
   it('キャンセルで一覧へ戻る。入力がある場合は確認し、拒否したら留まる', async () => {
     const confirm = vi.spyOn(window, 'confirm')
     const user = renderForm()
